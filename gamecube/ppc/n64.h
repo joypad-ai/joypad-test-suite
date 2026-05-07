@@ -55,4 +55,10 @@ void N64_Scan(N64State *state);
 // channel is not an N64 controller with a rumble pak.
 void N64_SetRumble(int chan, bool on);
 
+// Poll a GameCube ASCII keyboard on `chan` (must already be SI_GC_KEYBOARD).
+// On success fills `raw` with the full 8-byte SI response and returns true.
+// Phase A: caller dumps raw bytes on screen so the scancode → label table
+// can be built empirically from hardware. Phase B will add the lookup.
+bool GCKeyboard_Poll(int chan, u8 raw[8]);
+
 #endif

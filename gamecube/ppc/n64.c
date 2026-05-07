@@ -8,6 +8,7 @@
 #define SI_CMD_POLL 0x01
 #define SI_CMD_READ 0x02
 #define SI_CMD_WRITE 0x03
+#define SI_CMD_KBD_POLL 0x54
 #define N64_TYPE_CONTROLLER 0x05000000
 #define N64_TYPE_MOUSE      0x02000000
 
@@ -31,7 +32,9 @@ static bool rumble_state[SI_MAX_CHAN];
 // the buffer pointer for later (interrupt-driven) consumption.
 static u8 cmd_poll_buf[SI_MAX_CHAN] ATTRIBUTE_ALIGN(32);
 static u8 cmd_reset_buf[SI_MAX_CHAN] ATTRIBUTE_ALIGN(32);
+static u8 cmd_kbd_buf[SI_MAX_CHAN] ATTRIBUTE_ALIGN(32);
 static u8 reset_resp[SI_MAX_CHAN][3] ATTRIBUTE_ALIGN(32);
+static u8 kbd_resp[SI_MAX_CHAN][8] ATTRIBUTE_ALIGN(32);
 static u8 cmd_pak[SI_MAX_CHAN][35] ATTRIBUTE_ALIGN(32);
 static u8 poll_resp[SI_MAX_CHAN][4] ATTRIBUTE_ALIGN(32);
 static u8 read_resp[SI_MAX_CHAN][33] ATTRIBUTE_ALIGN(32);
@@ -276,4 +279,23 @@ void N64_Scan(N64State *state) {
     state[c].pak = pak_cache[c];
     state[c].rumble_active = rumble_state[c];
   }
+}
+
+// Poll a GameCube ASCII keyboard. SI cmd 0x54 returns 8 bytes; per
+// reverse-engineered docs (mostly from PSO), the 3 simultaneous keycodes
+// are at bytes 4..6 and the last byte is a checksum. The exact byte
+// layout varies across references — the only way to verify is to test
+// on hardware and watch which bytes change as keys are pressed. The
+// scancodes themselves are GC-specific (not USB HID) and need a lookup
+// table to render; for now we surface the raw bytes.
+bool GCKeyboard_Poll(int chan, u8 raw[8]) {
+  cmd_kbd_buf[chan] = SI_CMD_KBD_POLL;
+  u32 mask = (1u << chan);
+  xfer_done_mask &= ~mask;
+  if (!SI_Transfer(chan, &cmd_kbd_buf[chan], 1, kbd_resp[chan], 8, si_xfer_cb,
+                   65))
+    return false;
+  if (!wait_xfer(chan, 50)) return false;
+  memcpy(raw, kbd_resp[chan], 8);
+  return true;
 }

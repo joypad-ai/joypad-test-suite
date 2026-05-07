@@ -197,10 +197,25 @@ int main(int argc, char **argv) {
       if (n64[i].present) {
         snap_n64(&snap, &n64[i]);
       } else if (((raw_type & ~0xffff) & ~0x001F0000) == SI_GC_KEYBOARD) {
-        // GC ASCII keyboard — detection only; full key polling (cmd 0x54
-        // with 8-byte response carrying 3 simultaneous keycodes) is TODO,
-        // requires hardware to verify scancode→label mapping.
         snap.style = STYLE_KEYBOARD;
+        u8 raw[8] = {0};
+        GCKeyboard_Poll(i, raw);
+        // Render the keyboard port directly here so we can show the raw
+        // 8-byte response — which lets us reverse-engineer the scancode
+        // layout by watching which bytes change as keys are pressed.
+        SetPosition(0, base_row + i * 5);
+        SetFgColor(2, 2);
+        printf("Port %d ", i + 1);
+        SetFgColor(3, 2);
+        printf("Style: %s Pak: None         Rumble: Unavailable\n",
+               format_style(STYLE_KEYBOARD));
+        SetFgColor(7, 2);
+        printf("Raw bytes: %02x %02x %02x %02x %02x %02x %02x %02x\n",
+               raw[0], raw[1], raw[2], raw[3], raw[4], raw[5], raw[6],
+               raw[7]);
+        printf("                                                        \n");
+        printf("                                                        \n\n");
+        continue;
       } else if ((raw_type & SI_TYPE_MASK) == SI_TYPE_GC) {
         snap_gc(&snap, i, keysHeld[i]);
       }

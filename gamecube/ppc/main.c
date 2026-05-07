@@ -148,6 +148,7 @@ typedef enum {
   STYLE_N64,
   STYLE_GCN,
   STYLE_WAVEBIRD,
+  STYLE_WHEEL,
   STYLE_MOUSE,
   STYLE_KEYBOARD,
 } pad_style_t;
@@ -157,6 +158,7 @@ static const char *format_style(pad_style_t s) {
   case STYLE_N64:      return "N64     ";
   case STYLE_GCN:      return "GCN     ";
   case STYLE_WAVEBIRD: return "WaveBird";
+  case STYLE_WHEEL:    return "Wheel   ";
   case STYLE_MOUSE:    return "Mouse   ";
   case STYLE_KEYBOARD: return "Keyboard";
   default:             return "None    ";
@@ -541,6 +543,12 @@ int main(int argc, char **argv) {
                r[4], r[5], r[6], r[0] & 0x0F);
         printf("                                                      \n\n");
         continue;
+      } else if ((raw_type & ~0xffff) == SI_GC_STEERING) {
+        // GC Steering Wheel (Hori, JP-region racing accessory). Distinct
+        // SI device type — detection only; per-axis polling for wheel
+        // angle / pedals is TODO (would mirror the keyboard's bespoke
+        // poll path).
+        snap.style = STYLE_WHEEL;
       } else if ((raw_type & SI_TYPE_MASK) == SI_TYPE_GC) {
         snap_gc(&snap, i, keysHeld[i]);
       }

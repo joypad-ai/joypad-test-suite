@@ -189,6 +189,22 @@ int main(int argc, char **argv) {
       }
     }
 
+    // Cache keyboard detection sticky-style — libogc's periodic SI re-probe
+    // on channel 0 otherwise bounces SI_GetType between cached keyboard and
+    // BUSY/NORESP, causing the port to flicker between Keyboard and None.
+    static bool kbd_chan[4] = {false, false, false, false};
+    for (int i = 0; i < 4; i++) {
+      u32 t = SI_GetType(i);
+      if (((t & ~0xffff) & ~0x001F0000) == SI_GC_KEYBOARD) kbd_chan[i] = true;
+      // Also clear if libogc decisively reports something other than keyboard
+      // (e.g. NORESP for an empty port, GC_CONTROLLER for a swapped pad).
+      else if ((t & SI_ERROR_NO_RESPONSE) ||
+               (((t & ~0xffff) & ~0x001F0000) != 0 &&
+                ((t & SI_TYPE_MASK) == SI_TYPE_GC))) {
+        kbd_chan[i] = false;
+      }
+    }
+
     // Repaint each port at a fixed row (5 rows: header + 3 data + blank).
     int base_row = 5;
     for (int i = 0; i < 4; i++) {
@@ -196,13 +212,10 @@ int main(int argc, char **argv) {
       u32 raw_type = SI_GetType(i);
       if (n64[i].present) {
         snap_n64(&snap, &n64[i]);
-      } else if (((raw_type & ~0xffff) & ~0x001F0000) == SI_GC_KEYBOARD) {
+      } else if (kbd_chan[i]) {
         snap.style = STYLE_KEYBOARD;
-        u8 raw[8] = {0};
-        GCKeyboard_Poll(i, raw);
-        // Render the keyboard port directly here so we can show the raw
-        // 8-byte response — which lets us reverse-engineer the scancode
-        // layout by watching which bytes change as keys are pressed.
+        u8 r[8] = {0};
+        GCKeyboard_Poll(i, r);
         SetPosition(0, base_row + i * 5);
         SetFgColor(2, 2);
         printf("Port %d ", i + 1);
@@ -210,11 +223,11 @@ int main(int argc, char **argv) {
         printf("Style: %s Pak: None         Rumble: Unavailable\n",
                format_style(STYLE_KEYBOARD));
         SetFgColor(7, 2);
-        printf("Raw bytes: %02x %02x %02x %02x %02x %02x %02x %02x\n",
-               raw[0], raw[1], raw[2], raw[3], raw[4], raw[5], raw[6],
-               raw[7]);
-        printf("                                                        \n");
-        printf("                                                        \n\n");
+        printf("Raw : %02x %02x %02x %02x %02x %02x %02x %02x\n",
+               r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7]);
+        printf("Keys: %02x %02x %02x   counter=%x  checksum=%02x\n",
+               r[4], r[5], r[6], r[0] & 0x0F, r[7]);
+        printf("                                                      \n\n");
         continue;
       } else if ((raw_type & SI_TYPE_MASK) == SI_TYPE_GC) {
         snap_gc(&snap, i, keysHeld[i]);

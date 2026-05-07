@@ -57,8 +57,10 @@ void N64_SetRumble(int chan, bool on);
 
 // Poll a GameCube ASCII keyboard on `chan` (must already be SI_GC_KEYBOARD).
 // On success fills `raw` with the full 8-byte SI response and returns true.
-// Phase A: caller dumps raw bytes on screen so the scancode → label table
-// can be built empirically from hardware. Phase B will add the lookup.
+// Wire format (per joypad-os firmware, src/lib/joybus-pio):
+//   send: [0x54, mode=3, rumble=0]   (3 bytes)
+//   recv: [counter|err, _, _, _, key0, key1, key2, checksum]
+// Counter = low 4 bits of byte 0; checksum = key0^key1^key2^counter.
 bool GCKeyboard_Poll(int chan, u8 raw[8]);
 
 #endif

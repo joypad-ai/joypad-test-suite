@@ -8,6 +8,9 @@
 #define SI_CMD_POLL 0x01
 #define SI_CMD_READ 0x02
 #define SI_CMD_WRITE 0x03
+// GameCube keyboard polling. Like the standard GCN cmd 0x40, this is a
+// 3-byte command [cmd, mode, rumble] — sending only the cmd byte returns
+// stale data. Reference: joypad-os src/lib/joybus-pio (GamecubeConsole.c).
 #define SI_CMD_KBD_POLL 0x54
 #define N64_TYPE_CONTROLLER 0x05000000
 #define N64_TYPE_MOUSE      0x02000000
@@ -32,7 +35,7 @@ static bool rumble_state[SI_MAX_CHAN];
 // the buffer pointer for later (interrupt-driven) consumption.
 static u8 cmd_poll_buf[SI_MAX_CHAN] ATTRIBUTE_ALIGN(32);
 static u8 cmd_reset_buf[SI_MAX_CHAN] ATTRIBUTE_ALIGN(32);
-static u8 cmd_kbd_buf[SI_MAX_CHAN] ATTRIBUTE_ALIGN(32);
+static u8 cmd_kbd_buf[SI_MAX_CHAN][3] ATTRIBUTE_ALIGN(32);
 static u8 reset_resp[SI_MAX_CHAN][3] ATTRIBUTE_ALIGN(32);
 static u8 kbd_resp[SI_MAX_CHAN][8] ATTRIBUTE_ALIGN(32);
 static u8 cmd_pak[SI_MAX_CHAN][35] ATTRIBUTE_ALIGN(32);
@@ -289,10 +292,15 @@ void N64_Scan(N64State *state) {
 // scancodes themselves are GC-specific (not USB HID) and need a lookup
 // table to render; for now we surface the raw bytes.
 bool GCKeyboard_Poll(int chan, u8 raw[8]) {
-  cmd_kbd_buf[chan] = SI_CMD_KBD_POLL;
+  // 3-byte command: [0x54 cmd, mode, rumble]. Mode 3 is the default
+  // GC reading mode; rumble flag is always 0 for keyboards.
+  cmd_kbd_buf[chan][0] = SI_CMD_KBD_POLL;
+  cmd_kbd_buf[chan][1] = 0x03;
+  cmd_kbd_buf[chan][2] = 0x00;
   u32 mask = (1u << chan);
   xfer_done_mask &= ~mask;
-  if (!SI_Transfer(chan, &cmd_kbd_buf[chan], 1, kbd_resp[chan], 8, si_xfer_cb,
+  memset(kbd_resp[chan], 0, 8);
+  if (!SI_Transfer(chan, cmd_kbd_buf[chan], 3, kbd_resp[chan], 8, si_xfer_cb,
                    65))
     return false;
   if (!wait_xfer(chan, 50)) return false;

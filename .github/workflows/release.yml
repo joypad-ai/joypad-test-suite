@@ -72,6 +72,11 @@ jobs:
         working-directory: ${{ needs.parse.outputs.console }}
         run: python3 buildtools/make_banner.py opening.bnr
 
+      - name: Generate screensaver logo header
+        if: needs.parse.outputs.console == 'gamecube'
+        working-directory: ${{ needs.parse.outputs.console }}
+        run: python3 buildtools/make_logo.py
+
       - name: Build (GameCube)
         if: needs.parse.outputs.console == 'gamecube'
         run: |

@@ -5,8 +5,66 @@
 #include <ogc/lwp_watchdog.h>
 
 #include "../common/common_utils.h"
+#include "gen_logo.h"
 #include "n64.h"
 #include "ppc_utils.h"
+
+// XFB is YUY2-packed: each 32-bit word holds [Y0 Cb Y1 Cr] for a 2-pixel
+// horizontal pair. RGB→YUV (BT.601 limited range) per ANSI cycle color.
+typedef struct {
+  unsigned char y, cb, cr;
+} yuv_t;
+
+static const yuv_t cycle_yuv[] = {
+    { 81,  90, 240}, // red
+    {145,  54,  34}, // green
+    {210,  16, 146}, // yellow
+    { 41, 240, 110}, // blue
+    {106, 202, 222}, // magenta
+    {170, 166,  16}, // cyan
+    {235, 128, 128}, // white
+};
+#define CYCLE_LEN ((int)(sizeof(cycle_yuv) / sizeof(cycle_yuv[0])))
+
+#define BLACK_Y  16
+#define NEUTRAL_C 128
+
+static inline u32 yuv_pair(u8 y0, u8 y1, u8 cb, u8 cr) {
+  return ((u32)y0 << 24) | ((u32)cb << 16) | ((u32)y1 << 8) | cr;
+}
+
+static void xfb_clear_box(u32 *fb_words, int fb_pitch_words, int x_px,
+                          int y_px, int w, int h) {
+  u32 black = yuv_pair(BLACK_Y, BLACK_Y, NEUTRAL_C, NEUTRAL_C);
+  int x_pair = x_px / 2;
+  int w_pair = w / 2;
+  for (int row = 0; row < h; row++) {
+    u32 *line = fb_words + (y_px + row) * fb_pitch_words + x_pair;
+    for (int col = 0; col < w_pair; col++) line[col] = black;
+  }
+}
+
+static void xfb_draw_logo(u32 *fb_words, int fb_pitch_words, int x_px,
+                          int y_px, const yuv_t *col) {
+  int x_pair = x_px / 2;
+  for (int row = 0; row < LOGO_H; row++) {
+    u32 *line = fb_words + (y_px + row) * fb_pitch_words + x_pair;
+    const u8 *mask_row = &logo_mask[row * LOGO_BYTES_PER_ROW];
+    for (int col_pair = 0; col_pair < LOGO_W / 2; col_pair++) {
+      int idx_a = col_pair * 2;
+      int idx_b = idx_a + 1;
+      bool lit_a = mask_row[idx_a / 8] & (0x80 >> (idx_a % 8));
+      bool lit_b = mask_row[idx_b / 8] & (0x80 >> (idx_b % 8));
+      u8 y0 = lit_a ? col->y : BLACK_Y;
+      u8 y1 = lit_b ? col->y : BLACK_Y;
+      // Cb/Cr are shared between the pair (4:2:2). Use logo color when at
+      // least one of the pair is lit, neutral otherwise.
+      bool any_lit = lit_a || lit_b;
+      line[col_pair] = yuv_pair(y0, y1, any_lit ? col->cb : NEUTRAL_C,
+                                any_lit ? col->cr : NEUTRAL_C);
+    }
+  }
+}
 
 #define CONSOLE_START_POS 20
 
@@ -324,53 +382,44 @@ int main(int argc, char **argv) {
         diff_msec(last_activity, gettime()) >= IDLE_THRESHOLD_MS;
 
     if (idle) {
-      // === Screensaver: clear once on entry, then bounce a color-cycling
-      // ASCII rendition of the joypad logo (logo_solid.svg in branding/)
-      // around the screen, erasing the prior frame each step.
-      static const char *logo[] = {
-          "   _________   ",
-          "  /  +   o o\\  ",
-          " (  +++ ^_^   )",
-          "  \\  +   o o /  ",
-          "   '---------'  ",
-      };
-      const int LOGO_W = 15;
-      const int LOGO_H = 5;
-      const char *blank_row = "                ";  // LOGO_W + 1 spaces
+      // === Screensaver: bitmap-rendered joypad logo bounces around the XFB
+      // directly. Color cycles through cycle_yuv[] on each wall hit.
+      const int FB_W = rMode->fbWidth;
+      const int FB_H = rMode->xfbHeight;
+      const int FB_PITCH = FB_W / 2;     // 32-bit words per scanline
+      u32 *fb_words = (u32 *)xfb;
 
       if (!screensaver_on) {
-        printf("\x1b[2J");
+        // Clear the entire framebuffer to black.
+        u32 black = yuv_pair(BLACK_Y, BLACK_Y, NEUTRAL_C, NEUTRAL_C);
+        for (int i = 0; i < FB_PITCH * FB_H; i++) fb_words[i] = black;
         screensaver_on = true;
         ss_prev_x = -1;
+        ss_x = 80;  // pixel coords now
+        ss_y = 80;
       }
       ss_frame++;
-      // Move every 4th frame for a slower glide. Two LongWait(2) per loop
-      // iteration ≈ 33ms/frame, so this updates ~7-8 times per second.
       if ((ss_frame & 3) == 0) {
+        // Erase prior bounding box.
         if (ss_prev_x >= 0) {
-          for (int row = 0; row < LOGO_H; row++) {
-            SetPosition(ss_prev_x, ss_prev_y + row);
-            printf("%s", blank_row);
-          }
+          xfb_clear_box(fb_words, FB_PITCH, ss_prev_x, ss_prev_y, LOGO_W, LOGO_H);
         }
-        ss_x += ss_dx;
-        ss_y += ss_dy;
-        // Bounds for 480p NTSC console: ~77 chars wide × ~28 tall.
-        // Logo's left edge can travel up to (width - LOGO_W) so its right
-        // edge reaches the screen's right side.
-        const int max_x = 77 - LOGO_W;
-        const int max_y = 23;
-        if (ss_x <= 0)     { ss_x = 0;     ss_dx = -ss_dx; ss_color = (ss_color % 7) + 1; }
-        if (ss_x >= max_x) { ss_x = max_x; ss_dx = -ss_dx; ss_color = (ss_color % 7) + 1; }
-        if (ss_y <= 1)     { ss_y = 1;     ss_dy = -ss_dy; ss_color = (ss_color % 7) + 1; }
-        if (ss_y >= max_y) { ss_y = max_y; ss_dy = -ss_dy; ss_color = (ss_color % 7) + 1; }
-        SetFgColor(ss_color, 2);
-        for (int row = 0; row < LOGO_H; row++) {
-          SetPosition(ss_x, ss_y + row);
-          printf("%s", logo[row]);
-        }
-        fflush(stdout);
-        ss_prev_x = ss_x;
+        // Step + bounce. Move 4 px/update so the glide is visible without
+        // racing across the screen.
+        ss_x += ss_dx * 4;
+        ss_y += ss_dy * 2;
+        const int max_x = FB_W - LOGO_W - 24;   // leave overscan margin
+        const int max_y = FB_H - LOGO_H - 24;
+        const int min_x = 24;
+        const int min_y = 24;
+        if (ss_x <= min_x) { ss_x = min_x; ss_dx = -ss_dx; ss_color = (ss_color + 1) % CYCLE_LEN; }
+        if (ss_x >= max_x) { ss_x = max_x; ss_dx = -ss_dx; ss_color = (ss_color + 1) % CYCLE_LEN; }
+        if (ss_y <= min_y) { ss_y = min_y; ss_dy = -ss_dy; ss_color = (ss_color + 1) % CYCLE_LEN; }
+        if (ss_y >= max_y) { ss_y = max_y; ss_dy = -ss_dy; ss_color = (ss_color + 1) % CYCLE_LEN; }
+        // Pixel positions must be even (XFB packs 2 px/word).
+        int draw_x = ss_x & ~1;
+        xfb_draw_logo(fb_words, FB_PITCH, draw_x, ss_y, &cycle_yuv[ss_color]);
+        ss_prev_x = draw_x;
         ss_prev_y = ss_y;
       }
       LongWait(2);

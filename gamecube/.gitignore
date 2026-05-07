@@ -14,3 +14,6 @@ opening.bnr
 .idea/
 __pycache__/
 *.pyc
+
+# Generated header — produced by buildtools/make_logo.py
+ppc/gen_logo.h

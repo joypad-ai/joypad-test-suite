@@ -43,6 +43,11 @@ jobs:
         working-directory: ${{ matrix.console }}
         run: python3 buildtools/make_banner.py opening.bnr
 
+      - name: Generate screensaver logo header
+        if: matrix.console == 'gamecube'
+        working-directory: ${{ matrix.console }}
+        run: python3 buildtools/make_logo.py
+
       - name: Build (gamecube target)
         if: matrix.console == 'gamecube'
         run: |

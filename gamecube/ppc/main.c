@@ -33,6 +33,7 @@ static inline u32 yuv_pair(u8 y0, u8 y1, u8 cb, u8 cr) {
   return ((u32)y0 << 24) | ((u32)cb << 16) | ((u32)y1 << 8) | cr;
 }
 
+__attribute__((unused))
 static void xfb_clear_box(u32 *fb_words, int fb_pitch_words, int x_px,
                           int y_px, int w, int h) {
   u32 black = yuv_pair(BLACK_Y, BLACK_Y, NEUTRAL_C, NEUTRAL_C);
@@ -69,6 +70,51 @@ static void xfb_draw_logo(u32 *fb_words, int fb_pitch_words, int x_px,
                           int y_px, const yuv_t *col) {
   xfb_draw_mask(fb_words, fb_pitch_words, x_px, y_px, logo_mask, LOGO_W,
                 LOGO_H, LOGO_BYTES_PER_ROW, col);
+}
+
+// Single-pass screensaver composer: walks the union rect of (new logo,
+// old logo), writing each pixel pair exactly once. Pixels inside the new
+// logo bbox use mask + color, pixels outside that bbox (including where
+// the old logo was) get plain black. Eliminates the brief
+// just-erased/not-yet-drawn window that the old erase+draw two-step
+// created — that window was the source of the screensaver flicker on
+// scanouts that landed inside it.
+static void xfb_compose_logo(u32 *fb_words, int fb_pitch_words,
+                             int new_x, int new_y, int prev_x, int prev_y,
+                             const yuv_t *col) {
+  // Even-aligned union bbox (XFB packs 2 px / word).
+  int ux1 = (new_x < prev_x ? new_x : prev_x) & ~1;
+  int uy1 = new_y < prev_y ? new_y : prev_y;
+  int rmax = (new_x + LOGO_W > prev_x + LOGO_W ? new_x : prev_x) + LOGO_W;
+  int ux2 = (rmax + 1) & ~1;  // round up to even
+  int uy2 = (new_y + LOGO_H > prev_y + LOGO_H ? new_y : prev_y) + LOGO_H;
+  if (ux1 < 0) ux1 = 0;
+  if (uy1 < 0) uy1 = 0;
+  const u8 black_y = BLACK_Y, neutral = NEUTRAL_C;
+
+  for (int y = uy1; y < uy2; y++) {
+    int rel_y = y - new_y;
+    bool y_in_logo = rel_y >= 0 && rel_y < LOGO_H;
+    const u8 *mask_row = y_in_logo ? &logo_mask[rel_y * LOGO_BYTES_PER_ROW]
+                                   : NULL;
+    u32 *line = fb_words + y * fb_pitch_words;
+    for (int x = ux1; x < ux2; x += 2) {
+      bool lit_a = false, lit_b = false;
+      if (mask_row) {
+        int rel_a = x - new_x;
+        int rel_b = rel_a + 1;
+        if (rel_a >= 0 && rel_a < LOGO_W)
+          lit_a = mask_row[rel_a / 8] & (0x80 >> (rel_a % 8));
+        if (rel_b >= 0 && rel_b < LOGO_W)
+          lit_b = mask_row[rel_b / 8] & (0x80 >> (rel_b % 8));
+      }
+      u8 ya = lit_a ? col->y : black_y;
+      u8 yb = lit_b ? col->y : black_y;
+      bool any = lit_a || lit_b;
+      line[x / 2] = yuv_pair(ya, yb, any ? col->cb : neutral,
+                             any ? col->cr : neutral);
+    }
+  }
 }
 
 // Console column 0 sits at pixel x=20 (CONSOLE_START_POS, defined below).
@@ -424,36 +470,28 @@ int main(int argc, char **argv) {
         ss_x = 80;  // pixel coords now
         ss_y = 80;
       }
-      // Update every frame with small increments → smooth glide.
-      if (ss_prev_x >= 0) {
-        xfb_clear_box(fb_words, FB_PITCH, ss_prev_x, ss_prev_y, LOGO_W, LOGO_H);
-      }
-      // 4px / 3px per frame at 30Hz → ~120/90 px/sec (interlaced display
-      // shows two fields per frame; updating once per pair keeps both
-      // fields displaying the SAME logo position so we don't get the
-      // even/odd-line flicker that line-doubled sprites create when
-      // their content shifts mid-frame).
+      // Step + bounce.
       ss_x += ss_dx * 4;
       ss_y += ss_dy * 3;
-      // Bounce against the actual framebuffer edges. Whatever the TV
-      // overscan eats happens at the same outer ring regardless, so
-      // letting the sprite touch x=0 / x=FB_W-LOGO_W maximizes visible
-      // travel on CRTs with conservative overscan.
       const int max_x = FB_W - LOGO_W;
       const int max_y = FB_H - LOGO_H;
-      const int min_x = 0;
-      const int min_y = 0;
-      if (ss_x <= min_x) { ss_x = min_x; ss_dx = -ss_dx; ss_color = (ss_color + 1) % CYCLE_LEN; }
+      if (ss_x <= 0)     { ss_x = 0;     ss_dx = -ss_dx; ss_color = (ss_color + 1) % CYCLE_LEN; }
       if (ss_x >= max_x) { ss_x = max_x; ss_dx = -ss_dx; ss_color = (ss_color + 1) % CYCLE_LEN; }
-      if (ss_y <= min_y) { ss_y = min_y; ss_dy = -ss_dy; ss_color = (ss_color + 1) % CYCLE_LEN; }
+      if (ss_y <= 0)     { ss_y = 0;     ss_dy = -ss_dy; ss_color = (ss_color + 1) % CYCLE_LEN; }
       if (ss_y >= max_y) { ss_y = max_y; ss_dy = -ss_dy; ss_color = (ss_color + 1) % CYCLE_LEN; }
-      // Pixel positions must be even (XFB packs 2 px/word).
-      int draw_x = ss_x & ~1;
-      xfb_draw_logo(fb_words, FB_PITCH, draw_x, ss_y, &cycle_yuv[ss_color]);
+      int draw_x = ss_x & ~1;     // even alignment for XFB pair packing
+      int prev_x = ss_prev_x >= 0 ? ss_prev_x : draw_x;
+      int prev_y = ss_prev_x >= 0 ? ss_prev_y : ss_y;
+      // One pass over the union of (new, old) bbox: each pixel-pair gets
+      // its final value (logo or black) written exactly once. No
+      // intermediate just-cleared-not-yet-drawn frames for scanout to
+      // catch → no flicker.
+      xfb_compose_logo(fb_words, FB_PITCH, draw_x, ss_y, prev_x, prev_y,
+                       &cycle_yuv[ss_color]);
       ss_prev_x = draw_x;
       ss_prev_y = ss_y;
-      LongWait(2);  // 30 Hz update — pairs an even+odd field on the
-                    // same logo position, eliminating interlace flicker.
+      LongWait(2);  // 30 Hz update — both interlaced fields show the
+                    // same logo position, so even/odd lines agree.
       continue;
     }
 

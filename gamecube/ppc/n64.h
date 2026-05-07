@@ -25,6 +25,7 @@ typedef enum {
   N64_KIND_CONTROLLER,
   N64_KIND_MOUSE,
   N64_KIND_MIC,
+  N64_KIND_GBA,         // GBA connected via link cable
 } n64_kind_t;
 
 typedef enum {

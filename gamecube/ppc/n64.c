@@ -15,6 +15,7 @@
 #define N64_TYPE_CONTROLLER 0x05000000
 #define N64_TYPE_MOUSE      0x02000000
 #define N64_TYPE_MIC        0x00010000
+#define N64_TYPE_GBA        0x00040000
 
 #define PAK_ADDR_LABEL  0x0000
 #define PAK_ADDR_PROBE  0x8000
@@ -274,6 +275,7 @@ static n64_kind_t kind_for_type(u32 raw) {
   if (hi == N64_TYPE_CONTROLLER) return N64_KIND_CONTROLLER;
   if (hi == N64_TYPE_MOUSE)      return N64_KIND_MOUSE;
   if (hi == N64_TYPE_MIC)        return N64_KIND_MIC;
+  if (hi == N64_TYPE_GBA)        return N64_KIND_GBA;
   return N64_KIND_NONE;
 }
 

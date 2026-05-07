@@ -152,6 +152,7 @@ typedef enum {
   STYLE_WHEEL,
   STYLE_MOUSE,
   STYLE_MIC,
+  STYLE_GBA,
   STYLE_KEYBOARD,
 } pad_style_t;
 
@@ -163,6 +164,7 @@ static const char *format_style(pad_style_t s) {
   case STYLE_WHEEL:    return "Wheel   ";
   case STYLE_MOUSE:    return "Mouse   ";
   case STYLE_MIC:      return "Mic     ";
+  case STYLE_GBA:      return "GBA     ";
   case STYLE_KEYBOARD: return "Keyboard";
   default:             return "None    ";
   }
@@ -285,6 +287,7 @@ static void snap_n64(pad_snap_t *out, int chan, const N64State *s) {
   switch (s->kind) {
   case N64_KIND_MOUSE: out->style = STYLE_MOUSE; break;
   case N64_KIND_MIC:   out->style = STYLE_MIC;   break;
+  case N64_KIND_GBA:   out->style = STYLE_GBA;   break;
   default:             out->style = STYLE_N64;   break;
   }
   switch (s->pak) {

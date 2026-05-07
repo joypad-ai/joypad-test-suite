@@ -2,6 +2,7 @@
 #include <stdlib.h>
 
 #include <gccore.h>
+#include <ogc/lwp_watchdog.h>
 
 #include "../common/common_utils.h"
 #include "n64.h"
@@ -254,6 +255,19 @@ int main(int argc, char **argv) {
 #endif
   N64State n64[SI_MAX_CHAN] = {0};
 
+  // Idle screensaver state — bouncing "Joypad" tag protects CRTs from
+  // burn-in. Activates after IDLE_THRESHOLD_MS of no controller activity;
+  // any input (button, stick deflection, trigger, key press) wakes it.
+  const u64 IDLE_THRESHOLD_MS = 30000;
+  u64 last_activity = gettime();
+  bool screensaver_on = false;
+  int ss_x = 10, ss_y = 12;
+  int ss_dx = 1, ss_dy = 1;
+  int ss_color = 2;
+  int ss_prev_x = -1, ss_prev_y = -1;
+  int ss_frame = 0;
+  u8 prev_kbd_keys[4][3] = {0};
+
   while (1) {
     PAD_ScanPads();
     N64_Scan(n64);
@@ -284,6 +298,75 @@ int main(int argc, char **argv) {
                 ((t & SI_TYPE_MASK) == SI_TYPE_GC))) {
         kbd_chan[i] = false;
       }
+    }
+
+    // Detect any activity — wakes the screensaver and resets the idle timer.
+    bool active = false;
+    for (int i = 0; i < 4; i++) {
+      if (keysHeld[i]) active = true;
+      if (abs(PAD_StickX(i))     > 30 || abs(PAD_StickY(i))     > 30) active = true;
+      if (abs(PAD_SubStickX(i))  > 30 || abs(PAD_SubStickY(i))  > 30) active = true;
+      if (PAD_TriggerL(i) > 30 || PAD_TriggerR(i) > 30) active = true;
+      if (n64[i].present && n64[i].buttons) active = true;
+      if (n64[i].present &&
+          (abs(n64[i].stick_x) > 30 || abs(n64[i].stick_y) > 30)) active = true;
+      if (kbd_chan[i]) {
+        u8 r[8] = {0};
+        GCKeyboard_Poll(i, r);
+        for (int k = 0; k < 3; k++) {
+          if (r[4 + k] && r[4 + k] != prev_kbd_keys[i][k]) active = true;
+          prev_kbd_keys[i][k] = r[4 + k];
+        }
+      }
+    }
+    if (active) last_activity = gettime();
+    bool idle =
+        diff_msec(last_activity, gettime()) >= IDLE_THRESHOLD_MS;
+
+    if (idle) {
+      // === Screensaver: clear everything once on entry, then bounce a
+      // color-cycling "Joypad" tag around the screen, erasing the prior
+      // glyph location each frame so nothing stays lit on a CRT.
+      if (!screensaver_on) {
+        printf("\x1b[2J");
+        screensaver_on = true;
+        ss_prev_x = -1;
+      }
+      ss_frame++;
+      // Move every other frame so the logo doesn't blur across the screen.
+      if (ss_frame & 1) {
+        if (ss_prev_x >= 0) {
+          SetPosition(ss_prev_x, ss_prev_y);
+          printf("      ");
+        }
+        ss_x += ss_dx;
+        ss_y += ss_dy;
+        const int max_x = 60;  // rough console width minus tag
+        const int max_y = 28;
+        if (ss_x <= 0)     { ss_x = 0;     ss_dx = -ss_dx; ss_color = (ss_color % 7) + 1; }
+        if (ss_x >= max_x) { ss_x = max_x; ss_dx = -ss_dx; ss_color = (ss_color % 7) + 1; }
+        if (ss_y <= 1)     { ss_y = 1;     ss_dy = -ss_dy; ss_color = (ss_color % 7) + 1; }
+        if (ss_y >= max_y) { ss_y = max_y; ss_dy = -ss_dy; ss_color = (ss_color % 7) + 1; }
+        SetPosition(ss_x, ss_y);
+        SetFgColor(ss_color, 2);
+        printf("Joypad");
+        fflush(stdout);
+        ss_prev_x = ss_x;
+        ss_prev_y = ss_y;
+      }
+      LongWait(2);
+      continue;
+    }
+
+    if (screensaver_on) {
+      // Wake — clear the screensaver remnants and re-paint the title.
+      printf("\x1b[2J");
+      SetPosition(0, 3);
+      SetFgColor(2, 2);
+      printf("Joypad Test Suite");
+      SetFgColor(7, 2);
+      screensaver_on = false;
+      ss_prev_x = -1;
     }
 
     // Repaint each port at a fixed row (5 rows: header + 3 data + blank).

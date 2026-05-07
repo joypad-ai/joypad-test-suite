@@ -1,0 +1,1 @@
+void LongWait(int waitTime);

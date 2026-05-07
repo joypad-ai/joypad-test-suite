@@ -1,0 +1,16 @@
+# Build artifacts
+*.elf
+*.dol
+*.map
+build_gamecube/
+build_wii/
+
+# Generated banner — regenerate from branding/banner.png via
+# buildtools/make_banner.py
+opening.bnr
+
+# IDE
+.vscode/
+.idea/
+__pycache__/
+*.pyc

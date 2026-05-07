@@ -71,18 +71,24 @@ static void xfb_draw_logo(u32 *fb_words, int fb_pitch_words, int x_px,
                 LOGO_H, LOGO_BYTES_PER_ROW, col);
 }
 
+// Console column 0 sits at pixel x=20 (CONSOLE_START_POS, defined below).
+// With cropped masks (no internal padding) the bounding box left edge IS
+// the silhouette's visible edge — so placing the logo at x=20 makes its
+// left edge align exactly with the leftmost console character.
+#define CORNER_LOGO_X 20
+#define CORNER_LOGO_Y 16
+
 static void xfb_draw_corner_logo(u32 *fb_words, int fb_pitch_words) {
   static const yuv_t white = {235, 128, 128};
-  xfb_draw_mask(fb_words, fb_pitch_words, 16, 16, logo_small_mask,
-                LOGO_SMALL_W, LOGO_SMALL_H, LOGO_SMALL_BYTES_PER_ROW, &white);
+  xfb_draw_mask(fb_words, fb_pitch_words, CORNER_LOGO_X, CORNER_LOGO_Y,
+                logo_small_mask, LOGO_SMALL_W, LOGO_SMALL_H,
+                LOGO_SMALL_BYTES_PER_ROW, &white);
 }
 
 static void xfb_draw_title(u32 *fb_words, int fb_pitch_words) {
   static const yuv_t white = {235, 128, 128};
-  // Place to the right of the corner logo (logo ends at x=80, leave a
-  // small gap), vertically centered within the logo's 64px tall box.
-  const int title_x = 96;
-  const int title_y = 16 + (LOGO_SMALL_H - TITLE_H) / 2;
+  const int title_x = CORNER_LOGO_X + LOGO_SMALL_W + 16;
+  const int title_y = CORNER_LOGO_Y + (LOGO_SMALL_H - TITLE_H) / 2;
   xfb_draw_mask(fb_words, fb_pitch_words, title_x, title_y, title_mask,
                 TITLE_W, TITLE_H, TITLE_BYTES_PER_ROW, &white);
 }
@@ -422,8 +428,13 @@ int main(int argc, char **argv) {
       if (ss_prev_x >= 0) {
         xfb_clear_box(fb_words, FB_PITCH, ss_prev_x, ss_prev_y, LOGO_W, LOGO_H);
       }
-      ss_x += ss_dx * 3;
-      ss_y += ss_dy * 2;
+      // 4px / 3px per frame at 30Hz → ~120/90 px/sec (interlaced display
+      // shows two fields per frame; updating once per pair keeps both
+      // fields displaying the SAME logo position so we don't get the
+      // even/odd-line flicker that line-doubled sprites create when
+      // their content shifts mid-frame).
+      ss_x += ss_dx * 4;
+      ss_y += ss_dy * 3;
       // Bounce against the actual framebuffer edges. Whatever the TV
       // overscan eats happens at the same outer ring regardless, so
       // letting the sprite touch x=0 / x=FB_W-LOGO_W maximizes visible
@@ -441,7 +452,8 @@ int main(int argc, char **argv) {
       xfb_draw_logo(fb_words, FB_PITCH, draw_x, ss_y, &cycle_yuv[ss_color]);
       ss_prev_x = draw_x;
       ss_prev_y = ss_y;
-      LongWait(1);  // ~60 fps for the screensaver
+      LongWait(2);  // 30 Hz update — pairs an even+odd field on the
+                    // same logo position, eliminating interlace flicker.
       continue;
     }
 

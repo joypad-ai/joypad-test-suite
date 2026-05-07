@@ -55,9 +55,14 @@ def find_source() -> Path:
 
 
 def pack_mask(flat: Image.Image, w: int, h: int):
-    """Resize `flat` (grayscale, dark = silhouette) to w×h and pack into a
-    1-bit alpha mask (MSB-first per byte)."""
-    scaled = flat.resize((w, h), Image.LANCZOS)
+    """Crop `flat` (grayscale, dark = silhouette) to its silhouette bbox,
+    resize to w×h, and pack into a 1-bit alpha mask (MSB-first per byte).
+    Cropping first eliminates the empty padding around the silhouette so
+    placement in the framebuffer can align cleanly with the console grid."""
+    bw = flat.point(lambda v: 255 if v < 128 else 0, 'L')
+    bbox = bw.getbbox()
+    src = flat.crop(bbox) if bbox else flat
+    scaled = src.resize((w, h), Image.LANCZOS)
     bytes_per_row = w // 8
     packed = bytearray(bytes_per_row * h)
     lit = 0

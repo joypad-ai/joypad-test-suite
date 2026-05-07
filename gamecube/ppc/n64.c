@@ -14,6 +14,7 @@
 #define SI_CMD_KBD_POLL 0x54
 #define N64_TYPE_CONTROLLER 0x05000000
 #define N64_TYPE_MOUSE      0x02000000
+#define N64_TYPE_MIC        0x00010000
 
 #define PAK_ADDR_LABEL  0x0000
 #define PAK_ADDR_PROBE  0x8000
@@ -31,7 +32,7 @@
 #define PAK_PROBE_SNAP_STATION  0x85
 #define PAK_PROBE_TRANSFER_OFF  0xFE
 
-static u32 chan_type[SI_MAX_CHAN];
+static n64_kind_t chan_kind[SI_MAX_CHAN];
 static int fail_count[SI_MAX_CHAN];
 static n64_pak_t pak_cache[SI_MAX_CHAN];
 static u64 pak_probe_time[SI_MAX_CHAN];
@@ -259,7 +260,7 @@ int N64_GetBioBPM(int chan) {
 bool N64_GetBioPulsing(int chan) { return bio[chan].pulsing; }
 
 void N64_SetRumble(int chan, bool on) {
-  if (chan_type[chan] != N64_TYPE_CONTROLLER ||
+  if (chan_kind[chan] != N64_KIND_CONTROLLER ||
       pak_cache[chan] != N64_PAK_RUMBLE)
     return;
   if (rumble_state[chan] == on) return;
@@ -271,22 +272,16 @@ void N64_SetRumble(int chan, bool on) {
 static n64_kind_t kind_for_type(u32 raw) {
   u32 hi = raw & ~0xffff;
   if (hi == N64_TYPE_CONTROLLER) return N64_KIND_CONTROLLER;
-  if (hi == N64_TYPE_MOUSE) return N64_KIND_MOUSE;
+  if (hi == N64_TYPE_MOUSE)      return N64_KIND_MOUSE;
+  if (hi == N64_TYPE_MIC)        return N64_KIND_MIC;
   return N64_KIND_NONE;
 }
 
 void N64_Scan(N64State *state) {
   for (s32 c = 0; c < SI_MAX_CHAN; c++) {
-    n64_kind_t kind = kind_for_type(SI_GetType(c));
-    if (kind != N64_KIND_NONE) {
-      chan_type[c] =
-          (kind == N64_KIND_CONTROLLER) ? N64_TYPE_CONTROLLER : N64_TYPE_MOUSE;
-    }
-
-    kind = (chan_type[c] == N64_TYPE_CONTROLLER)
-               ? N64_KIND_CONTROLLER
-               : (chan_type[c] == N64_TYPE_MOUSE) ? N64_KIND_MOUSE
-                                                  : N64_KIND_NONE;
+    n64_kind_t fresh = kind_for_type(SI_GetType(c));
+    if (fresh != N64_KIND_NONE) chan_kind[c] = fresh;
+    n64_kind_t kind = chan_kind[c];
 
     if (kind == N64_KIND_NONE) {
       state[c].present = false;
@@ -299,22 +294,42 @@ void N64_Scan(N64State *state) {
       continue;
     }
 
-    if (si_poll(c)) {
+    // Only controllers + mice answer cmd 0x01 with a 4-byte input report.
+    // Mics and other peripherals use different protocols; for them we
+    // surface "present = true" + the kind label, with all input fields
+    // zero (TODO: per-kind polling).
+    bool poll_ok = false;
+    if (kind == N64_KIND_CONTROLLER || kind == N64_KIND_MOUSE) {
+      poll_ok = si_poll(c);
+    }
+    if (poll_ok) {
       state[c].present = true;
       state[c].kind = kind;
       state[c].buttons = (poll_resp[c][0] << 8) | poll_resp[c][1];
       state[c].stick_x = (s8)poll_resp[c][2];
       state[c].stick_y = (s8)poll_resp[c][3];
       fail_count[c] = 0;
-    } else if (++fail_count[c] >= 60) {
-      chan_type[c] = 0;
-      state[c].present = false;
-      state[c].kind = N64_KIND_NONE;
-      fail_count[c] = 0;
-      continue;
+    } else if (kind == N64_KIND_CONTROLLER || kind == N64_KIND_MOUSE) {
+      // Polling failed for a kind that should poll. Bail after a few
+      // consecutive failures.
+      if (++fail_count[c] >= 60) {
+        chan_kind[c] = N64_KIND_NONE;
+        state[c].present = false;
+        state[c].kind = N64_KIND_NONE;
+        fail_count[c] = 0;
+        continue;
+      }
+    } else {
+      // Kinds we don't poll yet (e.g. mic): mark present, no inputs.
+      state[c].present = true;
+      state[c].kind = kind;
+      state[c].buttons = 0;
+      state[c].stick_x = 0;
+      state[c].stick_y = 0;
     }
 
-    // Mice don't have an expansion slot, skip pak probing.
+    // Pak slot is only on N64 controllers (mouse / mic / keyboard / GBA
+    // have no expansion bay).
     if (kind != N64_KIND_CONTROLLER) {
       state[c].pak = N64_PAK_NONE;
       state[c].rumble_active = false;

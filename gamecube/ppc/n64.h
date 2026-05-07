@@ -24,6 +24,7 @@ typedef enum {
   N64_KIND_NONE,
   N64_KIND_CONTROLLER,
   N64_KIND_MOUSE,
+  N64_KIND_MIC,
 } n64_kind_t;
 
 typedef enum {

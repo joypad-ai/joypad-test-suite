@@ -66,6 +66,7 @@ static void xfb_draw_mask(u32 *fb_words, int fb_pitch_words, int x_px,
   }
 }
 
+__attribute__((unused))
 static void xfb_draw_logo(u32 *fb_words, int fb_pitch_words, int x_px,
                           int y_px, const yuv_t *col) {
   xfb_draw_mask(fb_words, fb_pitch_words, x_px, y_px, logo_mask, LOGO_W,
@@ -150,6 +151,7 @@ typedef enum {
   STYLE_WAVEBIRD,
   STYLE_WHEEL,
   STYLE_MOUSE,
+  STYLE_MIC,
   STYLE_KEYBOARD,
 } pad_style_t;
 
@@ -160,6 +162,7 @@ static const char *format_style(pad_style_t s) {
   case STYLE_WAVEBIRD: return "WaveBird";
   case STYLE_WHEEL:    return "Wheel   ";
   case STYLE_MOUSE:    return "Mouse   ";
+  case STYLE_MIC:      return "Mic     ";
   case STYLE_KEYBOARD: return "Keyboard";
   default:             return "None    ";
   }
@@ -279,7 +282,11 @@ static const char *format_rumble(bool supported, bool active) {
 }
 
 static void snap_n64(pad_snap_t *out, int chan, const N64State *s) {
-  out->style = (s->kind == N64_KIND_MOUSE) ? STYLE_MOUSE : STYLE_N64;
+  switch (s->kind) {
+  case N64_KIND_MOUSE: out->style = STYLE_MOUSE; break;
+  case N64_KIND_MIC:   out->style = STYLE_MIC;   break;
+  default:             out->style = STYLE_N64;   break;
+  }
   switch (s->pak) {
   case N64_PAK_MEMORY:       out->pak = PAK_MEMORY;       break;
   case N64_PAK_RUMBLE:       out->pak = PAK_RUMBLE;       break;

@@ -16,13 +16,15 @@ typedef enum {
   STYLE_NONE,
   STYLE_N64,
   STYLE_GCN,
+  STYLE_MOUSE,
 } pad_style_t;
 
 static const char *format_style(pad_style_t s) {
   switch (s) {
-  case STYLE_N64: return "N64    ";
-  case STYLE_GCN: return "GCN    ";
-  default:        return "None   ";
+  case STYLE_N64:   return "N64    ";
+  case STYLE_GCN:   return "GCN    ";
+  case STYLE_MOUSE: return "Mouse  ";
+  default:          return "None   ";
   }
 }
 
@@ -33,6 +35,7 @@ typedef enum {
   PAK_RUMBLE,
   PAK_TRANSFER,
   PAK_BIO_SENSOR,
+  PAK_SNAP_STATION,
 } pad_pak_t;
 
 // Unified per-port input snapshot. Fields the source controller doesn't have
@@ -52,12 +55,13 @@ typedef struct {
 
 static const char *format_pak(pad_pak_t p) {
   switch (p) {
-  case PAK_MEMORY:     return "Memory      ";
-  case PAK_RUMBLE:     return "Rumble Pak  ";
-  case PAK_TRANSFER:   return "Transfer Pak";
-  case PAK_BIO_SENSOR: return "Bio Sensor  ";
-  case PAK_UNKNOWN:    return "Unknown     ";
-  default:             return "None        ";
+  case PAK_MEMORY:       return "Memory      ";
+  case PAK_RUMBLE:       return "Rumble Pak  ";
+  case PAK_TRANSFER:     return "Transfer Pak";
+  case PAK_BIO_SENSOR:   return "Bio Sensor  ";
+  case PAK_SNAP_STATION: return "Snap Station";
+  case PAK_UNKNOWN:      return "Unknown     ";
+  default:               return "None        ";
   }
 }
 
@@ -67,14 +71,15 @@ static const char *format_rumble(bool supported, bool active) {
 }
 
 static void snap_n64(pad_snap_t *out, const N64State *s) {
-  out->style = STYLE_N64;
+  out->style = (s->kind == N64_KIND_MOUSE) ? STYLE_MOUSE : STYLE_N64;
   switch (s->pak) {
-  case N64_PAK_MEMORY:     out->pak = PAK_MEMORY;     break;
-  case N64_PAK_RUMBLE:     out->pak = PAK_RUMBLE;     break;
-  case N64_PAK_TRANSFER:   out->pak = PAK_TRANSFER;   break;
-  case N64_PAK_BIO_SENSOR: out->pak = PAK_BIO_SENSOR; break;
-  case N64_PAK_UNKNOWN:    out->pak = PAK_UNKNOWN;    break;
-  default:                 out->pak = PAK_NONE;       break;
+  case N64_PAK_MEMORY:       out->pak = PAK_MEMORY;       break;
+  case N64_PAK_RUMBLE:       out->pak = PAK_RUMBLE;       break;
+  case N64_PAK_TRANSFER:     out->pak = PAK_TRANSFER;     break;
+  case N64_PAK_BIO_SENSOR:   out->pak = PAK_BIO_SENSOR;   break;
+  case N64_PAK_SNAP_STATION: out->pak = PAK_SNAP_STATION; break;
+  case N64_PAK_UNKNOWN:      out->pak = PAK_UNKNOWN;      break;
+  default:                   out->pak = PAK_NONE;         break;
   }
   out->rumble_supported = (s->pak == N64_PAK_RUMBLE);
   out->rumble_active = s->rumble_active;
@@ -173,16 +178,12 @@ int main(int argc, char **argv) {
       keysHeld[i] = PAD_ButtonsHeld(i);
     }
 
-    // Rumble while A and B are held simultaneously (matches the original
-    // GC-Controller-Test "rumble test" combo).
+    // Rumble while A is held (matches libdragon's JoypadTest reference).
     for (int i = 0; i < 4; i++) {
       if (n64[i].present) {
-        bool both = (n64[i].buttons & N64_BTN_A) && (n64[i].buttons & N64_BTN_B);
-        N64_SetRumble(i, both);
+        N64_SetRumble(i, !!(n64[i].buttons & N64_BTN_A));
       } else if ((SI_GetType(i) & SI_TYPE_MASK) == SI_TYPE_GC) {
-        bool both =
-            (keysHeld[i] & PAD_BUTTON_A) && (keysHeld[i] & PAD_BUTTON_B);
-        PAD_ControlMotor(i, both ? 1 : 0);
+        PAD_ControlMotor(i, (keysHeld[i] & PAD_BUTTON_A) ? 1 : 0);
       }
     }
 

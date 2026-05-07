@@ -8,7 +8,8 @@
 #define SI_CMD_POLL 0x01
 #define SI_CMD_READ 0x02
 #define SI_CMD_WRITE 0x03
-#define N64_TYPE_ID 0x05000000
+#define N64_TYPE_CONTROLLER 0x05000000
+#define N64_TYPE_MOUSE      0x02000000
 
 #define PAK_ADDR_LABEL  0x0000
 #define PAK_ADDR_PROBE  0x8000
@@ -189,11 +190,20 @@ static n64_pak_t probe_pak(s32 chan) {
     return N64_PAK_TRANSFER;
   }
 
+  // Step 5: Snap Station probe (Pokémon Snap photo printer dock).
+  memset(data, PAK_PROBE_SNAP_STATION, sizeof(data));
+  if (pak_write(chan, PAK_ADDR_PROBE, data, NULL) &&
+      pak_read(chan, PAK_ADDR_PROBE, readback, NULL) &&
+      readback[0] == PAK_PROBE_SNAP_STATION) {
+    return N64_PAK_SNAP_STATION;
+  }
+
   return N64_PAK_NONE;
 }
 
 void N64_SetRumble(int chan, bool on) {
-  if (chan_type[chan] != N64_TYPE_ID || pak_cache[chan] != N64_PAK_RUMBLE)
+  if (chan_type[chan] != N64_TYPE_CONTROLLER ||
+      pak_cache[chan] != N64_PAK_RUMBLE)
     return;
   if (rumble_state[chan] == on) return;
   u8 buf[32];
@@ -201,12 +211,29 @@ void N64_SetRumble(int chan, bool on) {
   if (pak_write(chan, PAK_ADDR_RUMBLE, buf, NULL)) rumble_state[chan] = on;
 }
 
+static n64_kind_t kind_for_type(u32 raw) {
+  u32 hi = raw & ~0xffff;
+  if (hi == N64_TYPE_CONTROLLER) return N64_KIND_CONTROLLER;
+  if (hi == N64_TYPE_MOUSE) return N64_KIND_MOUSE;
+  return N64_KIND_NONE;
+}
+
 void N64_Scan(N64State *state) {
   for (s32 c = 0; c < SI_MAX_CHAN; c++) {
-    if ((SI_GetType(c) & ~0xffff) == N64_TYPE_ID) chan_type[c] = N64_TYPE_ID;
+    n64_kind_t kind = kind_for_type(SI_GetType(c));
+    if (kind != N64_KIND_NONE) {
+      chan_type[c] =
+          (kind == N64_KIND_CONTROLLER) ? N64_TYPE_CONTROLLER : N64_TYPE_MOUSE;
+    }
 
-    if (chan_type[c] != N64_TYPE_ID) {
+    kind = (chan_type[c] == N64_TYPE_CONTROLLER)
+               ? N64_KIND_CONTROLLER
+               : (chan_type[c] == N64_TYPE_MOUSE) ? N64_KIND_MOUSE
+                                                  : N64_KIND_NONE;
+
+    if (kind == N64_KIND_NONE) {
       state[c].present = false;
+      state[c].kind = N64_KIND_NONE;
       state[c].pak = N64_PAK_NONE;
       state[c].rumble_active = false;
       pak_cache[c] = N64_PAK_NONE;
@@ -217,6 +244,7 @@ void N64_Scan(N64State *state) {
 
     if (si_poll(c)) {
       state[c].present = true;
+      state[c].kind = kind;
       state[c].buttons = (poll_resp[c][0] << 8) | poll_resp[c][1];
       state[c].stick_x = (s8)poll_resp[c][2];
       state[c].stick_y = (s8)poll_resp[c][3];
@@ -224,7 +252,15 @@ void N64_Scan(N64State *state) {
     } else if (++fail_count[c] >= 60) {
       chan_type[c] = 0;
       state[c].present = false;
+      state[c].kind = N64_KIND_NONE;
       fail_count[c] = 0;
+      continue;
+    }
+
+    // Mice don't have an expansion slot, skip pak probing.
+    if (kind != N64_KIND_CONTROLLER) {
+      state[c].pak = N64_PAK_NONE;
+      state[c].rumble_active = false;
       continue;
     }
 

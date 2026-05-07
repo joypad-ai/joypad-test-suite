@@ -21,16 +21,24 @@
 #define N64_BTN_CRIGHT 0x0001
 
 typedef enum {
+  N64_KIND_NONE,
+  N64_KIND_CONTROLLER,
+  N64_KIND_MOUSE,
+} n64_kind_t;
+
+typedef enum {
   N64_PAK_NONE,
   N64_PAK_UNKNOWN,
   N64_PAK_MEMORY,
   N64_PAK_RUMBLE,
   N64_PAK_TRANSFER,
   N64_PAK_BIO_SENSOR,
+  N64_PAK_SNAP_STATION,
 } n64_pak_t;
 
 typedef struct {
-  bool present;
+  bool present;       // shorthand for kind != N64_KIND_NONE
+  n64_kind_t kind;
   u16 buttons;
   s8 stick_x;
   s8 stick_y;

@@ -196,7 +196,7 @@ int main(int argc, char **argv) {
       u32 raw_type = SI_GetType(i);
       if (n64[i].present) {
         snap_n64(&snap, &n64[i]);
-      } else if ((raw_type & ~0x001F0000) == SI_GC_KEYBOARD) {
+      } else if (((raw_type & ~0xffff) & ~0x001F0000) == SI_GC_KEYBOARD) {
         // GC ASCII keyboard — detection only; full key polling (cmd 0x54
         // with 8-byte response carrying 3 simultaneous keycodes) is TODO,
         // requires hardware to verify scancode→label mapping.

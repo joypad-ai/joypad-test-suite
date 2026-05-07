@@ -33,4 +33,7 @@ Originating copyrights are preserved in each console's source headers.
 
 ## License
 
-[zlib](LICENSE.md).
+Top-level repo (CI, build infra, this README): [MIT](LICENSE.md). Each
+console subdir carries its own license file matching its upstream
+origin — e.g. `gamecube/` is zlib via corenting's
+GC-Controller-Test (see [`gamecube/LICENSE.md`](gamecube/LICENSE.md)).

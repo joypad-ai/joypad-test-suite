@@ -116,6 +116,8 @@ typedef struct {
   pad_pak_t pak;
   bool rumble_supported;
   bool rumble_active;
+  int bio_bpm;          // valid when pak == PAK_BIO_SENSOR
+  bool bio_pulsing;
   s8 stick_x, stick_y;
   s8 cstick_x, cstick_y;
   u8 analog_l, analog_r;
@@ -141,7 +143,7 @@ static const char *format_rumble(bool supported, bool active) {
   return active ? "Active" : "Idle";
 }
 
-static void snap_n64(pad_snap_t *out, const N64State *s) {
+static void snap_n64(pad_snap_t *out, int chan, const N64State *s) {
   out->style = (s->kind == N64_KIND_MOUSE) ? STYLE_MOUSE : STYLE_N64;
   switch (s->pak) {
   case N64_PAK_MEMORY:       out->pak = PAK_MEMORY;       break;
@@ -154,6 +156,10 @@ static void snap_n64(pad_snap_t *out, const N64State *s) {
   }
   out->rumble_supported = (s->pak == N64_PAK_RUMBLE);
   out->rumble_active = s->rumble_active;
+  if (s->pak == N64_PAK_BIO_SENSOR) {
+    out->bio_bpm = N64_GetBioBPM(chan);
+    out->bio_pulsing = N64_GetBioPulsing(chan);
+  }
   out->stick_x = s->stick_x;
   out->stick_y = s->stick_y;
   out->a       = !!(s->buttons & N64_BTN_A);
@@ -201,7 +207,13 @@ static void print_port(int p, const pad_snap_t *s) {
   SetFgColor(3, 2);
   printf("Style: %s ", format_style(s->style));
   printf("Pak: %s ", format_pak(s->pak));
-  printf("Rumble: %-11s\n", format_rumble(s->rumble_supported, s->rumble_active));
+  if (s->pak == PAK_BIO_SENSOR) {
+    printf("BPM: %03d %-9s\n", s->bio_bpm,
+           s->bio_pulsing ? "(Pulsing)" : "(Resting)");
+  } else {
+    printf("Rumble: %-11s\n",
+           format_rumble(s->rumble_supported, s->rumble_active));
+  }
   SetFgColor(7, 2);
   printf("Stick: %+04d,%+04d C-Stick: %+04d,%+04d L-Trig:%03u R-Trig:%03u\n",
          s->stick_x, s->stick_y, s->cstick_x, s->cstick_y, s->analog_l,
@@ -280,7 +292,7 @@ int main(int argc, char **argv) {
       pad_snap_t snap = {0};
       u32 raw_type = SI_GetType(i);
       if (n64[i].present) {
-        snap_n64(&snap, &n64[i]);
+        snap_n64(&snap, i, &n64[i]);
       } else if (kbd_chan[i]) {
         snap.style = STYLE_KEYBOARD;
         u8 r[8] = {0};

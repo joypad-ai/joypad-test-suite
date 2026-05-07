@@ -55,6 +55,13 @@ void N64_Scan(N64State *state);
 // channel is not an N64 controller with a rumble pak.
 void N64_SetRumble(int chan, bool on);
 
+// Bio Sensor heart-rate readings. Only meaningful when the channel has a
+// Bio Sensor pak detected. BPM computed from pulsing→resting transitions
+// over a rolling window — returns 0 until enough samples have accumulated
+// (~4-5 seconds after the user puts a finger on the sensor).
+int  N64_GetBioBPM(int chan);
+bool N64_GetBioPulsing(int chan);
+
 // Poll a GameCube ASCII keyboard on `chan` (must already be SI_GC_KEYBOARD).
 // On success fills `raw` with the full 8-byte SI response and returns true.
 // Wire format (per joypad-os firmware, src/lib/joybus-pio):

@@ -18,6 +18,12 @@
 #define PAK_ADDR_LABEL  0x0000
 #define PAK_ADDR_PROBE  0x8000
 #define PAK_ADDR_RUMBLE 0xC000
+#define PAK_ADDR_BIO    0xC000  // same register, different accessory's view
+
+#define BIO_PERIOD_MS         500
+#define BIO_WINDOW_MIN        8     // samples needed before reporting BPM
+#define BIO_WINDOW_MAX        16
+#define BIO_PERIODS_PER_MIN   120   // 60s × 2 periods/sec
 
 #define PAK_PROBE_RUMBLE        0x80
 #define PAK_PROBE_BIO_SENSOR    0x81
@@ -30,6 +36,16 @@ static int fail_count[SI_MAX_CHAN];
 static n64_pak_t pak_cache[SI_MAX_CHAN];
 static u64 pak_probe_time[SI_MAX_CHAN];
 static bool rumble_state[SI_MAX_CHAN];
+
+// Bio Sensor heart-rate tracking, per channel.
+static struct {
+  bool pulsing;
+  u64 period_start;
+  u32 beats_in_period;
+  u32 period_count;        // periods accumulated since detection
+  u32 history[BIO_WINDOW_MAX];
+  u32 history_idx;         // ring index, 0..MAX-1
+} bio[SI_MAX_CHAN];
 
 // Per-channel SI buffers — separate per channel because SI_Transfer may queue
 // the buffer pointer for later (interrupt-driven) consumption.
@@ -207,6 +223,41 @@ static n64_pak_t probe_pak(s32 chan) {
   return N64_PAK_NONE;
 }
 
+static void bio_reset(int chan) {
+  memset((void *)&bio[chan], 0, sizeof(bio[chan]));
+}
+
+static void bio_update(int chan, u8 sensor_byte) {
+  bool now_pulsing = (sensor_byte == 0x00);
+  bool was_pulsing = bio[chan].pulsing;
+  bio[chan].pulsing = now_pulsing;
+
+  // Beat is detected on the falling edge (pulsing → resting).
+  if (was_pulsing && !now_pulsing) bio[chan].beats_in_period++;
+
+  u64 now = gettime();
+  if (bio[chan].period_start == 0) bio[chan].period_start = now;
+  if (diff_msec(bio[chan].period_start, now) >= BIO_PERIOD_MS) {
+    bio[chan].history[bio[chan].history_idx % BIO_WINDOW_MAX] =
+        bio[chan].beats_in_period;
+    bio[chan].history_idx++;
+    bio[chan].beats_in_period = 0;
+    bio[chan].period_count++;
+    bio[chan].period_start = now;
+  }
+}
+
+int N64_GetBioBPM(int chan) {
+  u32 n = bio[chan].period_count;
+  if (n < BIO_WINDOW_MIN) return 0;
+  if (n > BIO_WINDOW_MAX) n = BIO_WINDOW_MAX;
+  u32 sum = 0;
+  for (u32 i = 0; i < n; i++) sum += bio[chan].history[i];
+  return (int)((sum * BIO_PERIODS_PER_MIN) / n);
+}
+
+bool N64_GetBioPulsing(int chan) { return bio[chan].pulsing; }
+
 void N64_SetRumble(int chan, bool on) {
   if (chan_type[chan] != N64_TYPE_CONTROLLER ||
       pak_cache[chan] != N64_PAK_RUMBLE)
@@ -275,10 +326,23 @@ void N64_Scan(N64State *state) {
     u64 now = gettime();
     if (pak_probe_time[c] == 0 ||
         diff_msec(pak_probe_time[c], now) > 250) {
+      n64_pak_t prev = pak_cache[c];
       pak_cache[c] = probe_pak(c);
       pak_probe_time[c] = now;
       if (pak_cache[c] != N64_PAK_RUMBLE) rumble_state[c] = false;
+      // Reset bio-sensor state on transitions in/out of bio sensor mode.
+      if (prev != pak_cache[c] && (prev == N64_PAK_BIO_SENSOR ||
+                                   pak_cache[c] == N64_PAK_BIO_SENSOR)) {
+        bio_reset(c);
+      }
     }
+
+    // If bio sensor is active, sample the pulse register every frame.
+    if (pak_cache[c] == N64_PAK_BIO_SENSOR) {
+      u8 buf[32];
+      if (pak_read(c, PAK_ADDR_BIO, buf, NULL)) bio_update(c, buf[0]);
+    }
+
     state[c].pak = pak_cache[c];
     state[c].rumble_active = rumble_state[c];
   }

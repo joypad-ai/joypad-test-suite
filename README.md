@@ -21,6 +21,16 @@ A collection of homebrew controller test ROMs across game consoles. Each console
 
 See each console's `README.md` for build/flash instructions.
 
+## Acknowledgements
+
+Each console app has its own lineage. As more consoles join, this list grows.
+
+| Console | Origin / inspiration |
+|---|---|
+| GameCube | Derived from [corenting/GC-Controller-Test](https://github.com/corenting/GC-Controller-Test) (zlib). Multi-port layout and accessory probe flow modeled after [meeq/JoypadTest-N64](https://github.com/meeq/JoypadTest-N64). GC keyboard wire format and scancode table come from the [joypad-os](https://github.com/joypad-ai/joypad-os) firmware (`src/lib/joybus-pio`). |
+
+Originating copyrights are preserved in each console's source headers.
+
 ## License
 
-[zlib](LICENSE.md). The `gamecube/` subdir is a derivative of corenting's [GC-Controller-Test](https://github.com/corenting/GC-Controller-Test); their copyright is preserved.
+[zlib](LICENSE.md).

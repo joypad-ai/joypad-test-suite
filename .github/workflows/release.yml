@@ -1,0 +1,118 @@
+name: Release
+
+# Triggered by tags shaped like <console>-v<semver>, e.g. gamecube-v0.1.0,
+# n64-v0.2.3, etc. The console subdir comes from the prefix; only that
+# console's app is built and attached to a GitHub Release.
+on:
+  push:
+    tags:
+      - '*-v[0-9]+.[0-9]+.[0-9]+'
+      - '*-v[0-9]+.[0-9]+.[0-9]+-*'   # pre-release suffixes (alpha, rc, etc.)
+
+permissions:
+  contents: write   # needed to create the release
+
+jobs:
+  parse:
+    name: Parse tag
+    runs-on: ubuntu-latest
+    outputs:
+      console: ${{ steps.split.outputs.console }}
+      version: ${{ steps.split.outputs.version }}
+      title:   ${{ steps.split.outputs.title }}
+    steps:
+      - id: split
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          CONSOLE="${TAG%%-v*}"
+          VERSION="${TAG#*-v}"
+          case "$CONSOLE" in
+            gamecube) PRETTY="GameCube" ;;
+            wii)      PRETTY="Wii" ;;
+            n64)      PRETTY="Nintendo 64" ;;
+            snes)     PRETTY="Super Nintendo" ;;
+            gba)      PRETTY="Game Boy Advance" ;;
+            *)        PRETTY="$CONSOLE" ;;
+          esac
+          echo "console=$CONSOLE" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "title=Joypad Test Suite — $PRETTY v$VERSION" >> "$GITHUB_OUTPUT"
+
+  build-and-release:
+    name: Build + release ${{ needs.parse.outputs.console }} v${{ needs.parse.outputs.version }}
+    needs: parse
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Verify VERSION matches tag
+        run: |
+          FILE_VER="$(cat ${{ needs.parse.outputs.console }}/VERSION | tr -d '[:space:]')"
+          if [ "$FILE_VER" != "${{ needs.parse.outputs.version }}" ]; then
+            echo "::error::${{ needs.parse.outputs.console }}/VERSION ($FILE_VER) does not match tag (${{ needs.parse.outputs.version }})"
+            exit 1
+          fi
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Pillow
+        run: pip install --quiet Pillow
+
+      - name: Generate banner
+        working-directory: ${{ needs.parse.outputs.console }}
+        run: python3 buildtools/make_banner.py opening.bnr
+
+      - name: Build (GameCube)
+        if: needs.parse.outputs.console == 'gamecube'
+        run: |
+          docker run --rm \
+            -v "${{ github.workspace }}":/workspace \
+            -w /workspace/${{ needs.parse.outputs.console }} \
+            -u "$(id -u):$(id -g)" \
+            ghcr.io/extremscorner/libogc2:latest \
+            bash -c "apt-get install -y -qq --no-install-recommends -t bookworm-backports xorriso 2>/dev/null; TARGET_CONSOLE=gamecube make && TARGET_CONSOLE=wii make"
+
+      - name: Stage release artifacts
+        working-directory: ${{ needs.parse.outputs.console }}
+        run: |
+          mkdir -p _release
+          # Copy whatever .dol files the build produced + the banner.
+          for f in *.dol opening.bnr; do
+            [ -f "$f" ] && cp "$f" _release/
+          done
+          ls -la _release/
+
+      - name: Extract changelog section for this version
+        id: notes
+        working-directory: ${{ needs.parse.outputs.console }}
+        run: |
+          VERSION="${{ needs.parse.outputs.version }}"
+          if [ -f CHANGELOG.md ]; then
+            awk -v ver="v$VERSION" '
+              /^## / {
+                if (capture) exit
+                if (index($0, ver)) capture = 1
+                next
+              }
+              capture { print }
+            ' CHANGELOG.md > _notes.md
+          fi
+          if [ ! -s _notes.md ]; then
+            echo "Release ${{ needs.parse.outputs.title }}." > _notes.md
+          fi
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ needs.parse.outputs.title }}
+          body_path: ${{ needs.parse.outputs.console }}/_notes.md
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-alpha') || contains(github.ref_name, '-beta') || contains(github.ref_name, '-rc') }}
+          files: ${{ needs.parse.outputs.console }}/_release/*

@@ -1,0 +1,69 @@
+name: Build verification
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: build (${{ matrix.console }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - console: gamecube
+            image: ghcr.io/extremscorner/libogc2:latest
+            artifacts: |
+              gamecube/joypad-gc-gamecube.dol
+              gamecube/joypad-gc-wii.dol
+              gamecube/opening.bnr
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Pillow (for banner generation)
+        run: pip install --quiet Pillow
+
+      - name: Generate banner
+        working-directory: ${{ matrix.console }}
+        run: python3 buildtools/make_banner.py opening.bnr
+
+      - name: Build (gamecube target)
+        if: matrix.console == 'gamecube'
+        run: |
+          docker run --rm \
+            -v "${{ github.workspace }}":/workspace \
+            -w /workspace/${{ matrix.console }} \
+            -u "$(id -u):$(id -g)" \
+            ${{ matrix.image }} \
+            bash -c "apt-get install -y -qq --no-install-recommends -t bookworm-backports xorriso 2>/dev/null; TARGET_CONSOLE=gamecube make"
+
+      - name: Build (wii target)
+        if: matrix.console == 'gamecube'
+        run: |
+          docker run --rm \
+            -v "${{ github.workspace }}":/workspace \
+            -w /workspace/${{ matrix.console }} \
+            -u "$(id -u):$(id -g)" \
+            ${{ matrix.image }} \
+            bash -c "TARGET_CONSOLE=wii make"
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.console }}-${{ github.sha }}
+          path: ${{ matrix.artifacts }}
+          if-no-files-found: error
+          retention-days: 7

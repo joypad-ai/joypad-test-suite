@@ -85,9 +85,17 @@ def main():
     out_path = Path(sys.argv[1]) if len(sys.argv) > 1 else Path('opening.bnr')
 
     if BANNER_PNG.exists():
-        img = Image.open(BANNER_PNG).convert('RGB')
-        if img.size != (W, H):
-            sys.exit(f'{BANNER_PNG} must be {W}x{H}, got {img.size}')
+        src = Image.open(BANNER_PNG)
+        if src.size != (W, H):
+            sys.exit(f'{BANNER_PNG} must be {W}x{H}, got {src.size}')
+        # Composite onto a black background so transparent pixels become
+        # black rather than white (PIL's default RGB conversion).
+        if src.mode in ('RGBA', 'LA') or 'transparency' in src.info:
+            src = src.convert('RGBA')
+            bg = Image.new('RGBA', src.size, (0, 0, 0, 255))
+            img = Image.alpha_composite(bg, src).convert('RGB')
+        else:
+            img = src.convert('RGB')
         print(f'using hand-edited banner: {BANNER_PNG}')
     else:
         img = render_banner()

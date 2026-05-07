@@ -1,6 +1,6 @@
-# Joypad Test Suite — GameCube
+# Joypad Tester — GameCube
 
-GameCube/Wii build of the [Joypad Test Suite](../README.md). Tests every kind
+GameCube/Wii build of the [Joypad Tester](../README.md). Tests every kind
 of controller the SI bus can speak to — native GameCube controllers, N64
 controllers (via passive N64-to-GC adapter), N64 mice, and the GameCube ASCII
 keyboard.
@@ -91,8 +91,8 @@ counter for diagnosis. Scancode mapping mirrors the table in
 With devkitPro installed:
 
 ```
-TARGET_CONSOLE=gamecube make    # → joypad-gc-gamecube.dol
-TARGET_CONSOLE=wii      make    # → joypad-gc-wii.dol
+TARGET_CONSOLE=gamecube make    # → joypad-tester-gamecube.dol
+TARGET_CONSOLE=wii      make    # → joypad-tester-wii.dol
 ```
 
 Without devkitPro, the project ships a Docker wrapper that uses the
@@ -126,8 +126,8 @@ FlippyDrive, SD2SP2, etc.) with the `.dol` renamed to `default.dol`:
 
 ```
 SD root/
-  Joypad Test Suite/
-    default.dol     # joypad-gc-gamecube.dol from this build
+  Joypad Tester/
+    default.dol     # joypad-tester-gamecube.dol from this build
     opening.bnr
 ```
 
@@ -138,7 +138,7 @@ file browser; selecting the folder runs `default.dol`.
 
 Tagged as `gamecube-v<semver>` from the repo root — see
 [`gamecube/CHANGELOG.md`](CHANGELOG.md) for per-version notes. The release
-workflow attaches `joypad-gc-gamecube.dol`, `joypad-gc-wii.dol`, and
+workflow attaches `joypad-tester-gamecube.dol`, `joypad-tester-wii.dol`, and
 `opening.bnr` to each GitHub Release automatically.
 
 ## Origin / credits

@@ -21,8 +21,8 @@ jobs:
           - console: gamecube
             image: ghcr.io/extremscorner/libogc2:latest
             artifacts: |
-              gamecube/joypad-gc-gamecube.dol
-              gamecube/joypad-gc-wii.dol
+              gamecube/joypad-tester-gamecube.dol
+              gamecube/joypad-tester-wii.dol
               gamecube/opening.bnr
     steps:
       - name: Checkout

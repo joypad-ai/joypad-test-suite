@@ -110,9 +110,9 @@ def main():
         return s[:length].ljust(length, b'\x00')
 
     desc = (
-        pad(b'Joypad Test Suite', 0x20) +
+        pad(b'Joypad Tester', 0x20) +
         pad(b'corenting + N64 fork', 0x20) +
-        pad(b'Joypad Test Suite', 0x40) +
+        pad(b'Joypad Tester', 0x40) +
         pad(b'corenting + N64 fork', 0x40) +
         pad(b'Test GameCube and N64 controllers via passive adapter.', 0x80)
     )

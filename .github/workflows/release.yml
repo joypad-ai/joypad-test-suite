@@ -39,7 +39,7 @@ jobs:
           esac
           echo "console=$CONSOLE" >> "$GITHUB_OUTPUT"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "title=Joypad Test Suite — $PRETTY v$VERSION" >> "$GITHUB_OUTPUT"
+          echo "title=Joypad Tester — $PRETTY v$VERSION" >> "$GITHUB_OUTPUT"
 
   build-and-release:
     name: Build + release ${{ needs.parse.outputs.console }} v${{ needs.parse.outputs.version }}

@@ -1,4 +1,4 @@
-# Joypad Test Suite — GameCube — Changelog
+# Joypad Tester — GameCube — Changelog
 
 ## v0.1.0 — 2026-05-07
 

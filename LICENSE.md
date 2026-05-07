@@ -1,7 +1,7 @@
 zlib License
 
 (C) 2023 corenting (original GC-Controller-Test)
-(C) 2026 Robert Dale Smith (Joypad Test Suite extensions)
+(C) 2026 Robert Dale Smith (Joypad Tester extensions)
 
 This software is provided 'as-is', without any express or implied
 warranty.  In no event will the authors be held liable for any damages

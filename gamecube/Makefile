@@ -15,7 +15,7 @@ include $(DEVKITPRO)/libogc2/$(TARGET_CONSOLE)_rules
 # SOURCES is a list of directories containing source code
 # INCLUDES is a list of directories containing extra header files
 #---------------------------------------------------------------------------------
-TARGET		:=	joypad-gc
+TARGET		:=	joypad-tester
 BUILD		:=	build_$(TARGET_CONSOLE)
 SOURCES		:=	ppc common
 DATA		:=	data

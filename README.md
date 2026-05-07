@@ -1,4 +1,4 @@
-# Joypad Test Suite
+# Joypad Tester
 
 A collection of homebrew controller test ROMs across game consoles. Each console gets its own self-contained subdirectory with its own toolchain and build.
 

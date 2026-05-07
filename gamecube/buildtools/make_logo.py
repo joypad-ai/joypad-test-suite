@@ -20,7 +20,7 @@ LOGO_H = 160
 LOGO_SMALL_W = 64
 LOGO_SMALL_H = 64
 
-TITLE_TEXT = 'Joypad Test Suite'
+TITLE_TEXT = 'Joypad Tester'
 TITLE_FONT_SIZE = 36
 
 FONT_CANDIDATES = [

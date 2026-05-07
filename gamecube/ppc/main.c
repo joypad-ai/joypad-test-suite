@@ -44,26 +44,47 @@ static void xfb_clear_box(u32 *fb_words, int fb_pitch_words, int x_px,
   }
 }
 
-static void xfb_draw_logo(u32 *fb_words, int fb_pitch_words, int x_px,
-                          int y_px, const yuv_t *col) {
+static void xfb_draw_mask(u32 *fb_words, int fb_pitch_words, int x_px,
+                          int y_px, const u8 *mask, int w, int h,
+                          int bytes_per_row, const yuv_t *col) {
   int x_pair = x_px / 2;
-  for (int row = 0; row < LOGO_H; row++) {
+  for (int row = 0; row < h; row++) {
     u32 *line = fb_words + (y_px + row) * fb_pitch_words + x_pair;
-    const u8 *mask_row = &logo_mask[row * LOGO_BYTES_PER_ROW];
-    for (int col_pair = 0; col_pair < LOGO_W / 2; col_pair++) {
+    const u8 *mask_row = &mask[row * bytes_per_row];
+    for (int col_pair = 0; col_pair < w / 2; col_pair++) {
       int idx_a = col_pair * 2;
       int idx_b = idx_a + 1;
       bool lit_a = mask_row[idx_a / 8] & (0x80 >> (idx_a % 8));
       bool lit_b = mask_row[idx_b / 8] & (0x80 >> (idx_b % 8));
       u8 y0 = lit_a ? col->y : BLACK_Y;
       u8 y1 = lit_b ? col->y : BLACK_Y;
-      // Cb/Cr are shared between the pair (4:2:2). Use logo color when at
-      // least one of the pair is lit, neutral otherwise.
       bool any_lit = lit_a || lit_b;
       line[col_pair] = yuv_pair(y0, y1, any_lit ? col->cb : NEUTRAL_C,
                                 any_lit ? col->cr : NEUTRAL_C);
     }
   }
+}
+
+static void xfb_draw_logo(u32 *fb_words, int fb_pitch_words, int x_px,
+                          int y_px, const yuv_t *col) {
+  xfb_draw_mask(fb_words, fb_pitch_words, x_px, y_px, logo_mask, LOGO_W,
+                LOGO_H, LOGO_BYTES_PER_ROW, col);
+}
+
+static void xfb_draw_corner_logo(u32 *fb_words, int fb_pitch_words) {
+  static const yuv_t white = {235, 128, 128};
+  xfb_draw_mask(fb_words, fb_pitch_words, 16, 16, logo_small_mask,
+                LOGO_SMALL_W, LOGO_SMALL_H, LOGO_SMALL_BYTES_PER_ROW, &white);
+}
+
+static void xfb_draw_title(u32 *fb_words, int fb_pitch_words) {
+  static const yuv_t white = {235, 128, 128};
+  // Place to the right of the corner logo (logo ends at x=80, leave a
+  // small gap), vertically centered within the logo's 64px tall box.
+  const int title_x = 96;
+  const int title_y = 16 + (LOGO_SMALL_H - TITLE_H) / 2;
+  xfb_draw_mask(fb_words, fb_pitch_words, title_x, title_y, title_mask,
+                TITLE_W, TITLE_H, TITLE_BYTES_PER_ROW, &white);
 }
 
 #define CONSOLE_START_POS 20
@@ -301,11 +322,11 @@ int main(int argc, char **argv) {
   if (rMode->viTVMode & VI_NON_INTERLACE)
     VIDEO_WaitVSync();
 
-  // Title row sits below TV overscan.
-  SetPosition(0, 3);
-  SetFgColor(2, 2);
-  printf("Joypad Test Suite");
-  SetFgColor(7, 2);
+  // Paint corner logo + title bitmap directly to the XFB. Both are
+  // bitmap blits (not console text), so they're independent of the
+  // console grid — the port table renders below them via console.
+  xfb_draw_corner_logo((u32 *)xfb, rMode->fbWidth / 2);
+  xfb_draw_title((u32 *)xfb, rMode->fbWidth / 2);
 
   u16 keysHeld[4] = {0, 0, 0, 0};
 #ifdef __WII__
@@ -421,18 +442,19 @@ int main(int argc, char **argv) {
     }
 
     if (screensaver_on) {
-      // Wake — clear the screensaver remnants and re-paint the title.
+      // Wake — clear screensaver remnants and re-paint the corner
+      // sprite + title bitmap. Console redraws of port data follow below.
       printf("\x1b[2J");
-      SetPosition(0, 3);
-      SetFgColor(2, 2);
-      printf("Joypad Test Suite");
-      SetFgColor(7, 2);
+      xfb_draw_corner_logo((u32 *)xfb, rMode->fbWidth / 2);
+      xfb_draw_title((u32 *)xfb, rMode->fbWidth / 2);
       screensaver_on = false;
       ss_prev_x = -1;
     }
 
     // Repaint each port at a fixed row (5 rows: header + 3 data + blank).
-    int base_row = 5;
+    // Logo+title bitmaps occupy y=16..80 → port rendering starts at row 6
+    // (y=96, just below the logo's bottom edge with a clean gap).
+    int base_row = 6;
     for (int i = 0; i < 4; i++) {
       pad_snap_t snap = {0};
       u32 raw_type = SI_GetType(i);

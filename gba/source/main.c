@@ -98,15 +98,21 @@ static uint16_t pupil_for_state(eyes_state_t s)
 // host-side multiboot path varies in whether it leaves VBlank IRQs
 // firing — RP2040 joybus does, GameCube via SI_Transfer doesn't always
 // — so busy-poll VCOUNT (VBlank starts at line 160). Slightly less
-// power-efficient than Halt() but works in every host environment.
-void ResetHalt() {
+// power-efficient than Halt() but works in every host environment. RST
+// is checked inside the busy-poll so a host cmd 0xFF arriving during
+// the ~17ms wait triggers SystemCall(0x26) within microseconds —
+// without that, hot-replug / host-reboot re-multiboot stalls.
+static inline void poll_reset(void)
+{
     if (REG_JOYCNTRL & REG_JOYCTRL_RST) {
         SystemCall(0x26);
         while (1) ;
-        return;
     }
-    while (REG_VCOUNT >= 160) ;
-    while (REG_VCOUNT <  160) ;
+}
+
+void ResetHalt() {
+    while (REG_VCOUNT >= 160) poll_reset();
+    while (REG_VCOUNT <  160) poll_reset();
 }
 
 static volatile uint32_t vblank_count = 0;

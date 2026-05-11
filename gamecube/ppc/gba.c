@@ -34,7 +34,7 @@ extern const u32 gba_payload_len;
 #define CRC_SEED   0x15a0u
 
 #define GBA_DELAY_US 70
-#define GBA_READY_TIMEOUT_MS 1500
+#define GBA_READY_TIMEOUT_MS 4000  // accommodate soft-reset + payload reinit
 #define GBA_ECHO_ATTEMPTS 200  // 200 × 10ms = 2s, matches joypad-os's poll
 #define GBA_ECHO_INTERVAL_MS 10
 
@@ -163,18 +163,27 @@ int GBA_BootEmbedded(int chan) {
   u16 type;
   u8 js = 0;
 
-  // Loop reset+status until the GBA reports ready (PSF0 set in jstat).
-  // Matches FIX94/gba-link-cable-rom-sender's wait pattern; the BIOS may
-  // not be ready on the first try.
+  // One reset, then poll status until ready. cmd 0xFF triggers a
+  // SystemCall(0x26) hard-reset on the GBA side (when the GBA is
+  // already running a multibooted payload that polls REG_JOYCNTRL.RST),
+  // which takes ~1-2s for joypad-gba's display + libgba re-init. If we
+  // re-sent cmd 0xFF on every iteration we'd keep restarting that
+  // reset, never reaching the multiboot-wait state. Send the reset
+  // once; the cmd 0x00 status polls below tolerate transient timeouts
+  // while the GBA's reset cycle completes.
+  (void)gba_handshake(chan, true, &type, &js);
+
   u64 ready_deadline = gettime() + millisecs_to_ticks(GBA_READY_TIMEOUT_MS);
-  do {
-    if (!gba_handshake(chan, true, &type, &js)) return -2;
-    if (type != GBA_TYPE_ID) return -2;
-    if (!gba_handshake(chan, false, &type, &js)) return -2;
-    if (type != GBA_TYPE_ID) return -2;
+  bool ready = false;
+  while (!ready) {
     if (gettime() > ready_deadline) return -2;
-    busy_us(GBA_DELAY_US);
-  } while (!(js & JSTAT_PSF0));
+    if (gba_handshake(chan, false, &type, &js)
+        && type == GBA_TYPE_ID
+        && (js & JSTAT_PSF0))
+      ready = true;
+    else
+      busy_us(GBA_DELAY_US);
+  }
 
   busy_us(GBA_DELAY_US);
 

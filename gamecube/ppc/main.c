@@ -451,6 +451,11 @@ int main(int argc, char **argv) {
   u64 gba_retry_at[SI_MAX_CHAN] = {0};
   u8 gba_keys[SI_MAX_CHAN][2] = {{0}};
   u16 gba_missing[SI_MAX_CHAN] = {0};
+  // Frame counter used to defer the very first GBA multiboot attempt
+  // until after the UI has had a chance to draw. GBA_BootEmbedded
+  // blocks the main loop for ~5 s during upload, and if it fires on
+  // the first frame the user sees half-drawn UI then a freeze.
+  u32 frame_count = 0;
 
   // Idle screensaver state — bouncing "Joypad" tag protects CRTs from
   // burn-in. Activates after IDLE_THRESHOLD_MS of no controller activity;
@@ -470,6 +475,7 @@ int main(int argc, char **argv) {
     for (int i = 0; i < 4; i++) {
       keysHeld[i] = PAD_ButtonsHeld(i);
     }
+    frame_count++;
 
     // GBA: auto-multiboot any channel reporting a GBA, then poll the
     // running payload for REG_KEYINPUT each frame. Single-shot per
@@ -482,7 +488,9 @@ int main(int argc, char **argv) {
         if (gba_state[i] == GBA_RETRY && gettime() >= gba_retry_at[i]) {
           gba_state[i] = GBA_IDLE;
         }
-        if (gba_state[i] == GBA_IDLE) {
+        // Skip the first ~30 frames so the UI has time to draw before
+        // GBA_BootEmbedded's multi-second blocking upload kicks in.
+        if (gba_state[i] == GBA_IDLE && frame_count > 30) {
           int rc = GBA_BootEmbedded(i);
           gba_err[i] = (s8)rc;
           if (rc == 0) {
@@ -532,15 +540,29 @@ int main(int argc, char **argv) {
     // on channel 0 otherwise bounces SI_GetType between cached keyboard and
     // BUSY/NORESP, causing the port to flicker between Keyboard and None.
     static bool kbd_chan[4] = {false, false, false, false};
+    // Same sticky-cache treatment for the steering wheel. SI_GC_STEERING
+    // is the bare TYPE_GC value (0x08000000) — every transient state
+    // libogc churns through during a disconnect (e.g. status bits
+    // shedding from 0x09000000) momentarily looks like 0x08000000, so a
+    // raw-type comparison flickers the port to "Wheel" for empty/
+    // disconnected slots. Require a NO_RESPONSE-free read to latch.
+    static bool wheel_chan[4] = {false, false, false, false};
     for (int i = 0; i < 4; i++) {
       u32 t = SI_GetType(i);
-      if (((t & ~0xffff) & ~0x001F0000) == SI_GC_KEYBOARD) kbd_chan[i] = true;
+      u32 hi = (t & ~0xffff) & ~0x001F0000;
+      if (hi == SI_GC_KEYBOARD) kbd_chan[i] = true;
       // Also clear if libogc decisively reports something other than keyboard
       // (e.g. NORESP for an empty port, GC_CONTROLLER for a swapped pad).
       else if ((t & SI_ERROR_NO_RESPONSE) ||
-               (((t & ~0xffff) & ~0x001F0000) != 0 &&
-                ((t & SI_TYPE_MASK) == SI_TYPE_GC))) {
+               (hi != 0 && (t & SI_TYPE_MASK) == SI_TYPE_GC)) {
         kbd_chan[i] = false;
+      }
+      if (hi == SI_GC_STEERING && !(t & SI_ERROR_NO_RESPONSE)) {
+        wheel_chan[i] = true;
+      } else if ((t & SI_ERROR_NO_RESPONSE) ||
+                 (hi != SI_GC_STEERING && hi != 0 &&
+                  (t & SI_TYPE_MASK) == SI_TYPE_GC)) {
+        wheel_chan[i] = false;
       }
     }
 
@@ -666,7 +688,7 @@ int main(int argc, char **argv) {
                r[4], r[5], r[6], r[0] & 0x0F);
         printf("                                                      \n\n");
         continue;
-      } else if ((raw_type & ~0xffff) == SI_GC_STEERING) {
+      } else if (wheel_chan[i]) {
         // GC Steering Wheel (Hori, JP-region racing accessory). Distinct
         // SI device type — detection only; per-axis polling for wheel
         // angle / pedals is TODO (would mirror the keyboard's bespoke

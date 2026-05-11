@@ -547,6 +547,14 @@ int main(int argc, char **argv) {
     // raw-type comparison flickers the port to "Wheel" for empty/
     // disconnected slots. Require a NO_RESPONSE-free read to latch.
     static bool wheel_chan[4] = {false, false, false, false};
+    // Same sticky-cache treatment for standard GameCube controllers (wired
+    // + Wavebird-over-receiver). After a GBA disconnect libogc's
+    // SI_GetType walks through transients where the high bits land on
+    // (SI_TYPE_GC | something) without SI_GC_STANDARD set; a bare
+    // "(t & SI_TYPE_MASK) == SI_TYPE_GC" fallback latches that as GCN.
+    // Require SI_GC_STANDARD + no NO_RESPONSE to set; clear on any
+    // definitive non-controller GC reading or NORESP.
+    static bool gc_chan[4] = {false, false, false, false};
     for (int i = 0; i < 4; i++) {
       u32 t = SI_GetType(i);
       u32 hi = (t & ~0xffff) & ~0x001F0000;
@@ -563,6 +571,14 @@ int main(int argc, char **argv) {
                  (hi != SI_GC_STEERING && hi != 0 &&
                   (t & SI_TYPE_MASK) == SI_TYPE_GC)) {
         wheel_chan[i] = false;
+      }
+      if ((t & SI_TYPE_MASK) == SI_TYPE_GC && (t & SI_GC_STANDARD) &&
+          !(t & SI_ERROR_NO_RESPONSE)) {
+        gc_chan[i] = true;
+      } else if ((t & SI_ERROR_NO_RESPONSE) ||
+                 (hi != 0 && ((t & SI_TYPE_MASK) != SI_TYPE_GC ||
+                              !(t & SI_GC_STANDARD)))) {
+        gc_chan[i] = false;
       }
     }
 
@@ -653,7 +669,6 @@ int main(int argc, char **argv) {
     int base_row = 7;
     for (int i = 0; i < 4; i++) {
       pad_snap_t snap = {0};
-      u32 raw_type = SI_GetType(i);
       // If our state machine knows this channel hosts a GBA (idle/booted/
       // retry/failed), force the GBA display path regardless of what
       // libogc's SI_GetType currently reports — during/after multiboot
@@ -694,7 +709,7 @@ int main(int argc, char **argv) {
         // angle / pedals is TODO (would mirror the keyboard's bespoke
         // poll path).
         snap.style = STYLE_WHEEL;
-      } else if ((raw_type & SI_TYPE_MASK) == SI_TYPE_GC) {
+      } else if (gc_chan[i]) {
         snap_gc(&snap, i, keysHeld[i]);
       }
       // STYLE_NONE leaves all zeros, including style="None"

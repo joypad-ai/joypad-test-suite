@@ -1,4 +1,4 @@
-# Joypad Tester — PC Engine
+# Joypad Tester - PC Engine
 #
 # Builds a single HuCard ROM (joypad-tester.pce) from src/joypad_tester.c
 # using HuC. Designed to run inside the buildtools/ Docker image (which
@@ -8,7 +8,9 @@
 TARGET   := joypad-tester
 SRCDIR   := src
 BUILDDIR := build
-SOURCES  := $(SRCDIR)/joypad_tester.c
+CFILES   := joypad_tester.c
+HFILES   := gen_logo.h
+SOURCES  := $(addprefix $(SRCDIR)/,$(CFILES) $(HFILES))
 
 ROM := $(BUILDDIR)/$(TARGET).pce
 
@@ -17,10 +19,12 @@ ROM := $(BUILDDIR)/$(TARGET).pce
 all: $(ROM)
 
 # HuC writes its outputs alongside the source file regardless of where
-# we'd like them, so build inside BUILDDIR with a copy of the source.
-# Then rename the generated .pce to the canonical artifact name.
+# we'd like them, so stage everything inside BUILDDIR (the .c renamed to
+# the canonical target name, plus any local includes) and invoke huc
+# from there. Output: $(TARGET).pce.
 $(ROM): $(SOURCES) | $(BUILDDIR)
-	cp $(SOURCES) $(BUILDDIR)/$(TARGET).c
+	cp $(SRCDIR)/$(CFILES) $(BUILDDIR)/$(TARGET).c
+	cp $(SRCDIR)/$(HFILES) $(BUILDDIR)/
 	cd $(BUILDDIR) && huc -v $(TARGET).c
 	@echo "Built $(ROM)"
 

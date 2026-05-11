@@ -4,3 +4,4 @@
 *.o
 build/
 _release/
+.DS_Store

@@ -1,6 +1,6 @@
 name: Release
 
-# Triggered by tags shaped like <console>-v<semver>, e.g. gc-v0.1.0,
+# Triggered by tags shaped like <console>-v<semver>, e.g. gcn-v0.1.0,
 # pce-v0.2.3, etc. The console subdir comes from the prefix; only that
 # console's app is built and attached to a GitHub Release.
 on:
@@ -30,7 +30,7 @@ jobs:
           CONSOLE="${TAG%%-v*}"
           VERSION="${TAG#*-v}"
           case "$CONSOLE" in
-            gc)       PRETTY="GameCube" ;;
+            gcn)      PRETTY="GameCube" ;;
             wii)      PRETTY="Wii" ;;
             n64)      PRETTY="Nintendo 64" ;;
             snes)     PRETTY="Super Nintendo" ;;
@@ -62,27 +62,27 @@ jobs:
           fi
 
       - name: Set up Python
-        if: needs.parse.outputs.console == 'gc'
+        if: needs.parse.outputs.console == 'gcn'
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
       - name: Install Pillow
-        if: needs.parse.outputs.console == 'gc'
+        if: needs.parse.outputs.console == 'gcn'
         run: pip install --quiet Pillow
 
       - name: Generate banner
-        if: needs.parse.outputs.console == 'gc'
+        if: needs.parse.outputs.console == 'gcn'
         working-directory: ${{ needs.parse.outputs.console }}
         run: python3 buildtools/make_banner.py opening.bnr
 
       - name: Generate screensaver logo header
-        if: needs.parse.outputs.console == 'gc'
+        if: needs.parse.outputs.console == 'gcn'
         working-directory: ${{ needs.parse.outputs.console }}
         run: python3 buildtools/make_logo.py
 
       - name: Build (GameCube)
-        if: needs.parse.outputs.console == 'gc'
+        if: needs.parse.outputs.console == 'gcn'
         run: |
           docker run --rm \
             -v "${{ github.workspace }}":/workspace \
@@ -113,7 +113,7 @@ jobs:
             make
 
       - name: Stage release artifacts (GameCube)
-        if: needs.parse.outputs.console == 'gc'
+        if: needs.parse.outputs.console == 'gcn'
         working-directory: ${{ needs.parse.outputs.console }}
         run: |
           mkdir -p _release

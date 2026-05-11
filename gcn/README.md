@@ -136,12 +136,12 @@ file browser; selecting the folder runs `default.dol`.
 
 ## Releases
 
-Tagged as `gc-v<semver>` from the repo root — see
-[`gc/CHANGELOG.md`](CHANGELOG.md) for per-version notes. (The historical
-`gamecube-v0.1.0` tag predates the rename to short codenames; future
-releases use the `gc-` prefix.) The release
-workflow attaches `joypad-tester-gamecube.dol`, `joypad-tester-wii.dol`, and
-`opening.bnr` to each GitHub Release automatically.
+Tagged as `gcn-v<semver>` from the repo root — see
+[`gcn/CHANGELOG.md`](CHANGELOG.md) for per-version notes. (The
+historical `gamecube-v0.1.0` tag predates the rename to short 3-letter
+codenames; future releases use the `gcn-` prefix.) The release
+workflow attaches `joypad-tester-gamecube.dol`, `joypad-tester-wii.dol`,
+and `opening.bnr` to each GitHub Release automatically.
 
 ## Origin / credits
 

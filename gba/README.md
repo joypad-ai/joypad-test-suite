@@ -110,7 +110,7 @@ modifying the source — rebuild and commit `build/<variant>/<variant>_mb.gba`
 Two paths, depending on which variant and host:
 
 **Multiboot over GameCube link cable** — both variants. Build this
-repo's GameCube/Wii host (see [`../gc/`](../gc/)), connect a
+repo's GameCube/Wii host (see [`../gcn/`](../gcn/)), connect a
 GBA Link Cable from GameCube SI port 2 to the GBA, leave the GBA on the
 "Press Start" screen with no cartridge, and start the host. The host
 uploads `tester_mb.gba` via Kawasedo handshake + stream cipher and the
@@ -135,7 +135,7 @@ extern const uint8_t  joypad_payload[];
 extern const uint32_t joypad_payload_len;
 ```
 
-See [`../gc/ppc/gba.c`](../gc/ppc/gba.c) or joypad-os's
+See [`../gcn/ppc/gba.c`](../gcn/ppc/gba.c) or joypad-os's
 `src/native/host/gc/gba_multiboot.c` for a reference uploader
 implementation (Kawasedo handshake, stream cipher, polled WRITE/READ,
 unconditional handshake-complete write).

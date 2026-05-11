@@ -18,12 +18,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - console: gc
+          - console: gcn
             image: ghcr.io/extremscorner/libogc2:latest
             artifacts: |
-              gc/joypad-tester-gamecube.dol
-              gc/joypad-tester-wii.dol
-              gc/opening.bnr
+              gcn/joypad-tester-gamecube.dol
+              gcn/joypad-tester-wii.dol
+              gcn/opening.bnr
           - console: gba
             image: devkitpro/devkitarm:latest
             artifacts: |
@@ -50,21 +50,21 @@ jobs:
           python-version: '3.12'
 
       - name: Install Pillow (for banner generation)
-        if: matrix.console == 'gc'
+        if: matrix.console == 'gcn'
         run: pip install --quiet Pillow
 
       - name: Generate banner
-        if: matrix.console == 'gc'
+        if: matrix.console == 'gcn'
         working-directory: ${{ matrix.console }}
         run: python3 buildtools/make_banner.py opening.bnr
 
       - name: Generate screensaver logo header
-        if: matrix.console == 'gc'
+        if: matrix.console == 'gcn'
         working-directory: ${{ matrix.console }}
         run: python3 buildtools/make_logo.py
 
       - name: Build (gamecube target)
-        if: matrix.console == 'gc'
+        if: matrix.console == 'gcn'
         run: |
           docker run --rm \
             -v "${{ github.workspace }}":/workspace \
@@ -74,7 +74,7 @@ jobs:
             bash -c "apt-get install -y -qq --no-install-recommends -t bookworm-backports xorriso 2>/dev/null; TARGET_CONSOLE=gamecube make"
 
       - name: Build (wii target)
-        if: matrix.console == 'gc'
+        if: matrix.console == 'gcn'
         run: |
           docker run --rm \
             -v "${{ github.workspace }}":/workspace \

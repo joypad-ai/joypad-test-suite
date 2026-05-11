@@ -3,7 +3,7 @@ MIT License
 Copyright (c) 2026 Robert Dale Smith
 
 Each console subdirectory carries its own license file matching its
-upstream origin (e.g. `gc/LICENSE.md`). This file applies to the
+upstream origin (e.g. `gcn/LICENSE.md`). This file applies to the
 top-level repository scaffolding — README, CI workflows, build infra —
 and to any future shared helpers in a `common/` directory.
 

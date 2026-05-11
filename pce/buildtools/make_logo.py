@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Generate src/gen_logo.h: the joypad logo as 4x 32x32 PCE sprite quadrants.
 
-Reads the same source PNG as gc/buildtools/make_logo.py
-(../gc/branding/logo.png) so the bouncing logo looks identical across
+Reads the same source PNG as gcn/buildtools/make_logo.py
+(../gcn/branding/logo.png) so the bouncing logo looks identical across
 consoles. Each quadrant is encoded in PCE 4bpp planar format using a
 1-bit alpha mask (foreground = palette index 1, background = 0 /
 transparent). The PCE side cycles palette color 1 on each wall bounce
@@ -34,7 +34,7 @@ LOGO_PATHS = [
     JOYPAD_BRANDING / "logo_solid.svg",
     JOYPAD_BRANDING / "logo_solid.png",
     PCE_ROOT / "branding" / "logo.png",
-    REPO_ROOT / "gc" / "branding" / "logo.png",
+    REPO_ROOT / "gcn" / "branding" / "logo.png",
 ]
 
 

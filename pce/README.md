@@ -39,7 +39,7 @@ mouse-decoded mode (calls `mouse_enable()`) and raw-controller mode
 (calls `mouse_disable()`). Same toggle as upstream.
 
 Fields a controller doesn't have stay at zero — same convention as
-the other consoles in this repo (see [`../gc/README.md`](../gc/README.md)
+the other consoles in this repo (see [`../gcn/README.md`](../gcn/README.md)
 for the prior art).
 
 ## HuC toolchain

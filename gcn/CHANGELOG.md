@@ -2,11 +2,14 @@
 
 ## v0.2.0 — 2026-05-11
 
-First release under the new short-codename convention. The subdir is
-now `gc/` (was `gamecube/`) and the release tag is `gc-v0.2.0` (was
-`gamecube-v0.1.0`). The historical `gamecube-v0.1.0` tag/release stays
-intact as a frozen snapshot of the old layout — future releases all
-use the `gc-` prefix.
+First release under the new short-3-letter-codename convention. The
+subdir is now `gcn/` (was `gamecube/`) and the release tag is
+`gcn-v0.2.0` (was `gamecube-v0.1.0`). The historical `gamecube-v0.1.0`
+tag/release stays intact as a frozen snapshot of the old layout;
+future releases all use the `gcn-` prefix. (A short-lived intermediate
+`gc/` subdir + `gc-v` prefix was never shipped to release — we settled
+on `gcn` minutes after introducing it to avoid the 2-letter codename
+colliding with unrelated `gc/` directories in sibling repos.)
 
 ### Fixed
 
@@ -20,11 +23,11 @@ use the `gc-` prefix.
 
 ### Changed
 
-- Subdir rename `gamecube/` -> `gc/` to match the short-codename
-  convention used by `gba/`, `pce/`, and future consoles. Tag prefix
-  shifts from `gamecube-v*` to `gc-v*`. `TARGET_CONSOLE=gamecube|wii`
-  inside the libogc build is unchanged (that's the libogc internal
-  platform name, not our subdir codename).
+- Subdir rename `gamecube/` -> `gcn/` to match the short-3-letter-
+  codename convention used by `gba/`, `pce/`, and future consoles.
+  Tag prefix shifts from `gamecube-v*` to `gcn-v*`.
+  `TARGET_CONSOLE=gamecube|wii` inside the libogc build is unchanged
+  (that's the libogc internal platform name, not our subdir codename).
 
 ## v0.1.0 — 2026-05-07
 

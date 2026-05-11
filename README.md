@@ -6,20 +6,20 @@ A collection of homebrew controller test ROMs across game consoles. Each console
 
 | Console | Status | Path | License |
 |---|---|---|---|
-| GameCube | working | [`gc/`](gc/) | [zlib](gc/LICENSE.md) |
+| GameCube | working | [`gcn/`](gcn/) | [zlib](gcn/LICENSE.md) |
 | Game Boy Advance | working | [`gba/`](gba/) | [MIT](gba/LICENSE.md) |
 | PC Engine | scaffolded | [`pce/`](pce/) | [MIT](pce/LICENSE.md) |
 
-Subdirs use short codenames (`gc`, `gba`, `pce`, future `n64`/`snes`/…)
-matching homebrew-community conventions. Release tags follow the same
-prefix: `<codename>-v<semver>`.
+Subdirs use short 3-letter codenames (`gcn`, `gba`, `pce`, future
+`n64`/`snes`/…) matching homebrew-community conventions. Release tags
+follow the same prefix: `<codename>-v<semver>`.
 
 ## Per-console
 
 Each console subdir has its own `README.md` with what its app tests,
 how to build/flash, and any embedding notes. See:
 
-- [`gc/README.md`](gc/README.md)
+- [`gcn/README.md`](gcn/README.md)
 - [`gba/README.md`](gba/README.md)
 - [`pce/README.md`](pce/README.md)
 

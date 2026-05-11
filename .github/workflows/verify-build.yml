@@ -18,12 +18,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - console: gamecube
+          - console: gc
             image: ghcr.io/extremscorner/libogc2:latest
             artifacts: |
-              gamecube/joypad-tester-gamecube.dol
-              gamecube/joypad-tester-wii.dol
-              gamecube/opening.bnr
+              gc/joypad-tester-gamecube.dol
+              gc/joypad-tester-wii.dol
+              gc/opening.bnr
           - console: gba
             image: devkitpro/devkitarm:latest
             artifacts: |
@@ -31,6 +31,12 @@ jobs:
               gba/build/joypad/joypad_payload.c
               gba/build/tester/tester_mb.gba
               gba/build/tester/tester_payload.c
+          - console: pce
+            # HuC is built from source inside pce/buildtools/Dockerfile,
+            # so no upstream image — see the Build (PC Engine) step.
+            image: ""
+            artifacts: |
+              pce/build/joypad-tester.pce
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -44,21 +50,21 @@ jobs:
           python-version: '3.12'
 
       - name: Install Pillow (for banner generation)
-        if: matrix.console == 'gamecube'
+        if: matrix.console == 'gc'
         run: pip install --quiet Pillow
 
       - name: Generate banner
-        if: matrix.console == 'gamecube'
+        if: matrix.console == 'gc'
         working-directory: ${{ matrix.console }}
         run: python3 buildtools/make_banner.py opening.bnr
 
       - name: Generate screensaver logo header
-        if: matrix.console == 'gamecube'
+        if: matrix.console == 'gc'
         working-directory: ${{ matrix.console }}
         run: python3 buildtools/make_logo.py
 
       - name: Build (gamecube target)
-        if: matrix.console == 'gamecube'
+        if: matrix.console == 'gc'
         run: |
           docker run --rm \
             -v "${{ github.workspace }}":/workspace \
@@ -68,7 +74,7 @@ jobs:
             bash -c "apt-get install -y -qq --no-install-recommends -t bookworm-backports xorriso 2>/dev/null; TARGET_CONSOLE=gamecube make"
 
       - name: Build (wii target)
-        if: matrix.console == 'gamecube'
+        if: matrix.console == 'gc'
         run: |
           docker run --rm \
             -v "${{ github.workspace }}":/workspace \
@@ -85,6 +91,17 @@ jobs:
             -w /workspace/gba \
             -u "$(id -u):$(id -g)" \
             ${{ matrix.image }} \
+            make
+
+      - name: Build (PC Engine)
+        if: matrix.console == 'pce'
+        run: |
+          docker build -t joypad-tester-huc:ci pce/buildtools/
+          docker run --rm \
+            -v "${{ github.workspace }}":/workspace \
+            -w /workspace/pce \
+            -u "$(id -u):$(id -g)" \
+            joypad-tester-huc:ci \
             make
 
       - name: Upload artifacts

@@ -31,14 +31,24 @@ or the CI/release wiring.
 └── common/              # (future) cross-console shared helpers
 ```
 
+Subdir names are short codenames matching homebrew-community usage
+(`gc`, `gba`, `pce`, future `n64` / `snes` / …). The same codename is
+used as the release-tag prefix (`<codename>-v<semver>`). Don't introduce
+full-localized-name subdirs (`gamecube/`, `gameboyadvance/`, etc.) —
+the codename is the source of truth.
+
 Existing console subdirs at time of writing:
 
-- `gamecube/` — GameCube + Wii test app (libogc2-based, builds .dol;
-  also surfaces N64 controllers via the passive adapter on GC ports).
-  Origin: zlib (corenting GC-Controller-Test); `gamecube/LICENSE.md`.
+- `gc/` — GameCube + Wii test app (libogc2-based, builds .dol; also
+  surfaces N64 controllers via the passive adapter on GC ports).
+  Origin: zlib (corenting GC-Controller-Test); `gc/LICENSE.md`.
 - `gba/` — GBA multiboot payload, two variants from one source tree
   (eyes for joypad-os consumers, tester for the GameCube host or
   flashcart use). Origin: MIT (Doridian Joybus-PIO); `gba/LICENSE.md`.
+- `pce/` — PC Engine / TurboGrafx-16 test app (HuC, builds .pce).
+  Detects 2-button / 6-button pads and the PCE mouse via the standard
+  joypad port + multitap. Origin: MIT (dshadoff PCE_Mouse_Test);
+  `pce/LICENSE.md`.
 
 ## Console subdir conventions
 
@@ -92,10 +102,10 @@ only when the console has that surface; everything else is required.
 9. **`## Origin / credits`** — upstream lineage (project + license +
    link), what this subtree adds, and a link to `LICENSE.md`.
 
-`gamecube/README.md` is the canonical example. When adding a new
-console, copy its skeleton and fill each section in — don't reorder or
-rename headings, because the top-level README and CLAUDE.md both
-reference them.
+`gc/README.md` is the canonical example. When adding a new console,
+copy its skeleton and fill each section in — don't reorder or rename
+headings, because the top-level README and CLAUDE.md both reference
+them.
 
 ### Build outputs
 
@@ -127,8 +137,11 @@ means adding a matrix entry + the corresponding build step(s).
 
 ## CI: releases (`.github/workflows/release.yml`)
 
-Tag-driven. Tag format: `<console>-v<semver>` (e.g. `gamecube-v0.1.0`,
-`gba-v0.2.3`). Pre-release suffixes allowed (`-alpha.1`, `-rc.2`, …).
+Tag-driven. Tag format: `<console>-v<semver>` (e.g. `gc-v0.2.0`,
+`gba-v0.2.3`, `pce-v0.1.0`). Pre-release suffixes allowed (`-alpha.1`,
+`-rc.2`, …). One historical `gamecube-v0.1.0` tag predates the rename
+to short codenames — it stays as a frozen release; future GC releases
+use `gc-v*`.
 
 The workflow:
 

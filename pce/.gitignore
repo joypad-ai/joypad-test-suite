@@ -1,0 +1,6 @@
+*.lst
+*.sym
+*.s.bak
+*.o
+build/
+_release/

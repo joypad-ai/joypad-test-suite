@@ -1,7 +1,7 @@
 name: Release
 
-# Triggered by tags shaped like <console>-v<semver>, e.g. gamecube-v0.1.0,
-# n64-v0.2.3, etc. The console subdir comes from the prefix; only that
+# Triggered by tags shaped like <console>-v<semver>, e.g. gc-v0.1.0,
+# pce-v0.2.3, etc. The console subdir comes from the prefix; only that
 # console's app is built and attached to a GitHub Release.
 on:
   push:
@@ -30,11 +30,12 @@ jobs:
           CONSOLE="${TAG%%-v*}"
           VERSION="${TAG#*-v}"
           case "$CONSOLE" in
-            gamecube) PRETTY="GameCube" ;;
+            gc)       PRETTY="GameCube" ;;
             wii)      PRETTY="Wii" ;;
             n64)      PRETTY="Nintendo 64" ;;
             snes)     PRETTY="Super Nintendo" ;;
             gba)      PRETTY="Game Boy Advance" ;;
+            pce)      PRETTY="PC Engine" ;;
             *)        PRETTY="$CONSOLE" ;;
           esac
           echo "console=$CONSOLE" >> "$GITHUB_OUTPUT"
@@ -61,27 +62,27 @@ jobs:
           fi
 
       - name: Set up Python
-        if: needs.parse.outputs.console == 'gamecube'
+        if: needs.parse.outputs.console == 'gc'
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
       - name: Install Pillow
-        if: needs.parse.outputs.console == 'gamecube'
+        if: needs.parse.outputs.console == 'gc'
         run: pip install --quiet Pillow
 
       - name: Generate banner
-        if: needs.parse.outputs.console == 'gamecube'
+        if: needs.parse.outputs.console == 'gc'
         working-directory: ${{ needs.parse.outputs.console }}
         run: python3 buildtools/make_banner.py opening.bnr
 
       - name: Generate screensaver logo header
-        if: needs.parse.outputs.console == 'gamecube'
+        if: needs.parse.outputs.console == 'gc'
         working-directory: ${{ needs.parse.outputs.console }}
         run: python3 buildtools/make_logo.py
 
       - name: Build (GameCube)
-        if: needs.parse.outputs.console == 'gamecube'
+        if: needs.parse.outputs.console == 'gc'
         run: |
           docker run --rm \
             -v "${{ github.workspace }}":/workspace \
@@ -100,8 +101,19 @@ jobs:
             devkitpro/devkitarm:latest \
             make
 
+      - name: Build (PC Engine)
+        if: needs.parse.outputs.console == 'pce'
+        run: |
+          docker build -t joypad-tester-huc:release pce/buildtools/
+          docker run --rm \
+            -v "${{ github.workspace }}":/workspace \
+            -w /workspace/pce \
+            -u "$(id -u):$(id -g)" \
+            joypad-tester-huc:release \
+            make
+
       - name: Stage release artifacts (GameCube)
-        if: needs.parse.outputs.console == 'gamecube'
+        if: needs.parse.outputs.console == 'gc'
         working-directory: ${{ needs.parse.outputs.console }}
         run: |
           mkdir -p _release
@@ -119,6 +131,14 @@ jobs:
           cp build/joypad/joypad_payload.c    _release/
           cp build/tester/tester_mb.gba       _release/
           cp build/tester/tester_payload.c    _release/
+          ls -la _release/
+
+      - name: Stage release artifacts (PC Engine)
+        if: needs.parse.outputs.console == 'pce'
+        working-directory: pce
+        run: |
+          mkdir -p _release
+          cp build/joypad-tester.pce _release/
           ls -la _release/
 
       - name: Extract changelog section for this version

@@ -1,5 +1,28 @@
 # Joypad Tester
 
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="branding/logo_solid.svg">
+    <source media="(prefers-color-scheme: light)" srcset="branding/logo_solid_black.svg">
+    <img alt="Joypad Tester" src="branding/logo_solid_black.svg" width="300">
+  </picture>
+</p>
+<p align="center">
+  <strong>Open-Source Controller Test ROMs for Retro Game Consoles</strong>
+</p>
+<p align="center">
+  Drop a single .dol / .gba / .pce on a flash cart and inspect every<br>controller, accessory, and protocol quirk on the bus.
+</p>
+<p align="center">
+  <a href="https://github.com/joypad-ai/joypad-tester/releases"><img src="https://img.shields.io/github/downloads/joypad-ai/joypad-tester/total?style=for-the-badge&label=Downloads" alt="Downloads" /></a>
+  <a href="https://github.com/joypad-ai/joypad-tester/blob/main/LICENSE.md"><img src="https://img.shields.io/github/license/joypad-ai/joypad-tester?style=for-the-badge" alt="License" /></a>
+  <a href="https://github.com/joypad-ai/joypad-tester/actions/workflows/verify-build.yml"><img src="https://img.shields.io/github/actions/workflow/status/joypad-ai/joypad-tester/verify-build.yml?style=for-the-badge&label=CI" alt="CI Status" /></a>
+  <a href="https://docs.joypad.ai/"><img src="https://img.shields.io/badge/Docs-docs.joypad.ai-blue?style=for-the-badge" alt="Documentation" /></a>
+  <a href="http://community.joypad.ai/"><img src="https://img.shields.io/discord/1133112432684978256?style=for-the-badge&logo=discord&label=Discord" alt="Discord" /></a>
+</p>
+
+---
+
 A collection of homebrew controller test ROMs across game consoles. Each console gets its own self-contained subdirectory with its own toolchain and build.
 
 ## Consoles
@@ -8,7 +31,7 @@ A collection of homebrew controller test ROMs across game consoles. Each console
 |---|---|---|---|
 | GameCube | working | [`gcn/`](gcn/) | [zlib](gcn/LICENSE.md) |
 | Game Boy Advance | working | [`gba/`](gba/) | [MIT](gba/LICENSE.md) |
-| PC Engine | scaffolded | [`pce/`](pce/) | [MIT](pce/LICENSE.md) |
+| PC Engine | working | [`pce/`](pce/) | [MIT](pce/LICENSE.md) |
 
 Subdirs use short 3-letter codenames (`gcn`, `gba`, `pce`, future
 `n64`/`snes`/…) matching homebrew-community conventions. Release tags

@@ -116,15 +116,26 @@ jobs:
         if: needs.parse.outputs.console == 'gcn'
         working-directory: ${{ needs.parse.outputs.console }}
         run: |
-          # Flash-cart-friendly artifact names:
-          # joypad_tester_v<ver>_<platform>.dol so a user dropping the
-          # download onto an SD card sees the project + version inline.
-          # opening.bnr keeps its canonical name (required by Swiss).
+          # Two release artifacts:
+          #   joypad_tester_v<ver>_gcn.zip -- pre-built Swiss folder
+          #     layout for GC SD-card loaders (FlippyDrive, GC Loader,
+          #     SD2SP2, etc.). Contains:
+          #       Joypad Tester/
+          #         default.dol  (renamed from joypad-tester-gamecube.dol;
+          #                       Swiss looks for this filename)
+          #         opening.bnr  (Swiss banner, required by name)
+          #   joypad_tester_v<ver>_wii.dol -- bare Wii build for the
+          #     Homebrew Channel.
           VERSION="${{ needs.parse.outputs.version }}"
           mkdir -p _release
-          [ -f joypad-tester-gamecube.dol ] && cp joypad-tester-gamecube.dol "_release/joypad_tester_v${VERSION}_gamecube.dol"
-          [ -f joypad-tester-wii.dol ]      && cp joypad-tester-wii.dol      "_release/joypad_tester_v${VERSION}_wii.dol"
-          [ -f opening.bnr ] && cp opening.bnr _release/
+          if [ -f joypad-tester-gamecube.dol ] && [ -f opening.bnr ]; then
+            mkdir -p "_stage/Joypad Tester"
+            cp joypad-tester-gamecube.dol "_stage/Joypad Tester/default.dol"
+            cp opening.bnr                "_stage/Joypad Tester/opening.bnr"
+            (cd _stage && zip -r "../_release/joypad_tester_v${VERSION}_gcn.zip" "Joypad Tester")
+            rm -rf _stage
+          fi
+          [ -f joypad-tester-wii.dol ] && cp joypad-tester-wii.dol "_release/joypad_tester_v${VERSION}_wii.dol"
           ls -la _release/
 
       - name: Stage release artifacts (GBA)

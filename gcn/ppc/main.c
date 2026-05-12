@@ -175,7 +175,7 @@ typedef enum {
 static const char *format_style(pad_style_t s) {
   switch (s) {
   case STYLE_N64:      return "N64     ";
-  case STYLE_GCN:      return "GCN     ";
+  case STYLE_GCN:      return "GCC     ";
   case STYLE_WAVEBIRD: return "WaveBird";
   case STYLE_BONGO:    return "DK Bongo";
   case STYLE_DANCEMAT: return "DanceMat";

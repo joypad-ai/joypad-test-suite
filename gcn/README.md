@@ -125,29 +125,44 @@ python3 buildtools/make_banner.py opening.bnr
 
 ## Loading on hardware
 
-Drop the `.dol` and `opening.bnr` into a folder on your Swiss SD (GC Loader,
-FlippyDrive, SD2SP2, etc.) with the `.dol` renamed to `default.dol`:
+### GameCube (Swiss / GC Loader / FlippyDrive / SD2SP2)
+
+Grab `joypad_tester_v<ver>_gcn.zip` from the release and extract it
+to your SD root. The archive already contains the Swiss-ready folder
+layout, so you'll end up with:
 
 ```
 SD root/
   Joypad Tester/
-    default.dol     # joypad_tester_v<ver>_gamecube.dol from the release
-                    # (or joypad-tester-gamecube.dol straight from a local build)
+    default.dol
     opening.bnr
 ```
 
-Swiss reads `opening.bnr` and shows the banner image + description in its
-file browser; selecting the folder runs `default.dol`.
+Swiss reads `opening.bnr` and shows the banner image + description in
+its file browser; selecting the folder runs `default.dol`.
+
+### Wii (Homebrew Channel)
+
+Grab `joypad_tester_v<ver>_wii.dol` and load it through the Homebrew
+Channel (either drop into `apps/JoypadTester/boot.dol` on your SD or
+send via WiiLoad).
 
 ## Releases
 
 Tagged as `gcn-v<semver>` from the repo root — see
 [`gcn/CHANGELOG.md`](CHANGELOG.md) for per-version notes. The release
-workflow attaches `joypad_tester_v<semver>_gamecube.dol`,
-`joypad_tester_v<semver>_wii.dol`, and `opening.bnr` to each GitHub
-Release. (In-tree build outputs use the libogc-target names
-`joypad-tester-gamecube.dol` / `joypad-tester-wii.dol`; release staging
-renames them for flash-cart drop-in legibility.)
+workflow attaches:
+
+- `joypad_tester_v<semver>_gcn.zip` — pre-built Swiss folder layout
+  (extract to SD root, boot via Swiss).
+- `joypad_tester_v<semver>_wii.dol` — bare Wii build for Homebrew
+  Channel.
+
+(In-tree build outputs are `joypad-tester-gamecube.dol`,
+`joypad-tester-wii.dol`, and `opening.bnr` — release staging renames
+the GC `.dol` to `default.dol`, bundles it with the banner, and zips
+the result; the Wii `.dol` gets a flash-cart-friendly name and ships
+loose.)
 
 ## Origin / credits
 

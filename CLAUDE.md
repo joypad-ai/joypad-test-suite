@@ -66,10 +66,11 @@ subdirs" list.
 | File          | Purpose                                                       |
 |---------------|---------------------------------------------------------------|
 | `VERSION`     | Bare semver string. Must match the release tag (see below).   |
-| `CHANGELOG.md`| Per-console changelog. First section header `## v<semver> — <date>`. |
+| `CHANGELOG.md`| Brief per-version diff index. Header `## v<semver> — <date>`, 2-5 bullet lines per version, link to the matching `releases/v<ver>.md`. |
 | `LICENSE.md`  | Whatever the upstream code's licence is (zlib, MIT, …).        |
 | `README.md`   | Audience-facing overview: what the app is, how to build, how to embed. |
 | `Makefile`    | Build entrypoint. Use a Docker-based toolchain if it eases CI. |
+| `releases/v<ver>.md` | Long-form release notes for that version. Used verbatim as the GitHub Release body. Lets the CHANGELOG stay short and scannable. |
 
 ### README structure (every console subdir)
 
@@ -168,18 +169,24 @@ the pretty name in the `parse` job.
 
 ## Release flow for a console
 
-To cut, e.g., `gba-v0.2.0`:
+To cut, e.g., `gba-v1.1.0`:
 
-1. Bump `<console>/VERSION` to `0.2.0`.
-2. Prepend a new section to `<console>/CHANGELOG.md`:
-   `## v0.2.0 — YYYY-MM-DD` followed by bullet-point release notes.
-3. Commit + push to `main`.
-4. Tag `<console>-v0.2.0` and push the tag.
-5. CI parses the tag, verifies VERSION, builds, and publishes the
-   GitHub Release with artifacts + the changelog section as the body.
+1. Bump `<console>/VERSION` to `1.1.0`.
+2. Write the full release notes to `<console>/releases/v1.1.0.md`
+   (this is what end-users see as the GitHub Release body).
+3. Prepend a short section to `<console>/CHANGELOG.md`:
+   `## v1.1.0 — YYYY-MM-DD`, 2-5 bullets summarising the diff,
+   and a link to `releases/v1.1.0.md` for details.
+4. Commit + push to `main`.
+5. Tag `<console>-v1.1.0` and push the tag.
+6. CI parses the tag, verifies VERSION, builds, and publishes the
+   GitHub Release with artifacts + `releases/v1.1.0.md` as the body
+   (falls back to the CHANGELOG section if the release-notes file
+   doesn't exist).
 
 If `VERSION` doesn't match the tag, the release fails (intentional —
-forces the changelog and version-bump commits to land before the tag).
+forces the changelog/release-notes/version-bump commits to land
+before the tag).
 
 ## Top-level README
 

@@ -150,6 +150,7 @@ typedef enum {
   STYLE_N64,
   STYLE_GCN,
   STYLE_WAVEBIRD,
+  STYLE_BONGO,
   STYLE_WHEEL,
   STYLE_MOUSE,
   STYLE_MIC,
@@ -162,6 +163,7 @@ static const char *format_style(pad_style_t s) {
   case STYLE_N64:      return "N64     ";
   case STYLE_GCN:      return "GCN     ";
   case STYLE_WAVEBIRD: return "WaveBird";
+  case STYLE_BONGO:    return "DK Bongo";
   case STYLE_WHEEL:    return "Wheel   ";
   case STYLE_MOUSE:    return "Mouse   ";
   case STYLE_MIC:      return "Mic     ";
@@ -354,9 +356,19 @@ static void snap_gc(pad_snap_t *out, int p, u16 buttons) {
   u32 t = SI_GetType(p);
   out->style = ((t & SI_GC_WAVEBIRD) == SI_GC_WAVEBIRD) ? STYLE_WAVEBIRD
                                                        : STYLE_GCN;
-  // WaveBird ships without a rumble motor (SI_GC_NOMOTOR is set in
-  // wireless types). Standard GC controllers have it built in.
-  out->rumble_supported = !(t & SI_GC_NOMOTOR);
+  // DK Bongo (TaruKonga) shares the SI device type with a standard
+  // controller (0x09000000); libogc disambiguates by watching the
+  // PAD_USE_ORIGIN bit in the status report -- bongos never set it,
+  // so PAD_IsBarrel latches the channel as "barrel" (libogc's
+  // internal codename for the drum). Override the style after
+  // ScanPads has had a chance to set the barrel bit.
+  if (PAD_IsBarrel(p)) {
+    out->style = STYLE_BONGO;
+  }
+  // Bongos and WaveBirds have no rumble motor; SI_GC_NOMOTOR is set
+  // in the wireless type for WaveBird. Standard GC controllers do
+  // have a motor.
+  out->rumble_supported = !(t & SI_GC_NOMOTOR) && out->style != STYLE_BONGO;
   out->stick_x = PAD_StickX(p);
   out->stick_y = PAD_StickY(p);
   out->cstick_x = PAD_SubStickX(p);

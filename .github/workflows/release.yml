@@ -127,12 +127,13 @@ jobs:
         working-directory: gba
         run: |
           mkdir -p _release
-          # Only the playable .gba ROMs go in the public release.
-          # _payload.c (C-array form for compile-time embedding) lives in
-          # the committed gba/build/ tree; submodule consumers like
-          # joypad-os pull it from the working tree, not from a Release
-          # artifact, so attaching it to the Release would be noise.
-          cp build/joypad/joypad_mb.gba  _release/
+          # Public release ships only the user-facing tester ROM.
+          # The eyes variant (joypad_mb.gba) is a firmware payload meant
+          # to be multibooted by a separate host (joypad-os keeps its
+          # own copy for that role), not run standalone -- end-users
+          # downloading the release want a playable joypad tester. The
+          # eyes build still lives in gba/build/ for source-tree consumers
+          # but doesn't get a Release attachment.
           cp build/tester/tester_mb.gba  _release/
           ls -la _release/
 

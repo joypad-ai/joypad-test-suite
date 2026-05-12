@@ -144,11 +144,11 @@ unconditional handshake-complete write).
 
 Tagged as `gba-v<semver>` from the repo root — see
 [`gba/CHANGELOG.md`](CHANGELOG.md) for per-version notes. The release
-workflow attaches the two playable ROMs (`joypad_mb.gba`,
-`tester_mb.gba`) to each GitHub Release. The C-array embed forms
-(`build/<variant>/<variant>_payload.c`) stay in the committed `build/`
-tree for submodule consumers — they're not duplicated to Release
-artifacts.
+workflow attaches only `tester_mb.gba` — the user-facing standalone
+button tester. The eyes variant (`joypad_mb.gba`) is a firmware payload
+meant to be multibooted by a host firmware (joypad-os keeps its own
+copy for that role); it builds and ships in `gba/build/joypad/` for
+source-tree inspection but doesn't get a Release attachment.
 
 ## Origin / credits
 

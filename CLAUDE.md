@@ -70,7 +70,7 @@ subdirs" list.
 | `LICENSE.md`  | Whatever the upstream code's licence is (zlib, MIT, …).        |
 | `README.md`   | Audience-facing overview: what the app is, how to build, how to embed. |
 | `Makefile`    | Build entrypoint. Use a Docker-based toolchain if it eases CI. |
-| `releases/v<ver>.md` | Long-form release notes for that version. Used verbatim as the GitHub Release body. Lets the CHANGELOG stay short and scannable. |
+| `releases/v<ver>.md` | Short release notes for that version (used verbatim as the GitHub Release body — keep it scannable: 1-paragraph summary, 3-6 highlight bullets, an Artifacts list, and a link to the per-console README for full detail). |
 
 ### README structure (every console subdir)
 
@@ -172,11 +172,14 @@ the pretty name in the `parse` job.
 To cut, e.g., `gba-v1.1.0`:
 
 1. Bump `<console>/VERSION` to `1.1.0`.
-2. Write the full release notes to `<console>/releases/v1.1.0.md`
-   (this is what end-users see as the GitHub Release body).
+2. Write the short release notes to `<console>/releases/v1.1.0.md`
+   (this is what end-users see as the GitHub Release body — scannable
+   summary + 3-6 highlight bullets + Artifacts list + a link to the
+   per-console README for full detail). Long-form feature breakdowns
+   belong in README.md, not here.
 3. Prepend a short section to `<console>/CHANGELOG.md`:
    `## v1.1.0 — YYYY-MM-DD`, 2-5 bullets summarising the diff,
-   and a link to `releases/v1.1.0.md` for details.
+   and a link to `releases/v1.1.0.md` for the release-page form.
 4. Commit + push to `main`.
 5. Tag `<console>-v1.1.0` and push the tag.
 6. CI parses the tag, verifies VERSION, builds, and publishes the

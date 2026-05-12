@@ -97,6 +97,11 @@ export OUTPUT	:=	$(CURDIR)/$(TARGET)-$(TARGET_CONSOLE)
 .PHONY: $(BUILD) clean gba-payload-sync
 
 #---------------------------------------------------------------------------------
+$(BUILD): gba-payload-sync
+	@[ -d $@ ] || mkdir -p $@
+	@$(MAKE) --no-print-directory -C $(BUILD) -f $(CURDIR)/Makefile
+
+#---------------------------------------------------------------------------------
 # Vendor the GBA tester ROM (../gba/build/tester/tester_payload.c) into
 # ppc/gba_payload.c with the symbol renamed joypad_payload ->
 # gba_payload so it doesn't collide with anything else in this tree.
@@ -104,6 +109,10 @@ export OUTPUT	:=	$(CURDIR)/$(TARGET)-$(TARGET_CONSOLE)
 # gba/build/'s output is newer than the committed vendor, refresh
 # automatically before recompiling. Future hosts (n64/, etc.) that
 # multiboot the same GBA tester should mirror this rule.
+#
+# IMPORTANT: declared *after* $(BUILD) so it doesn't hijack the default
+# goal. Make picks the first non-special target as the default; we
+# rely on $(BUILD) being that target.
 GBA_PAYLOAD_SRC := $(CURDIR)/../gba/build/tester/tester_payload.c
 GBA_PAYLOAD_OUT := $(CURDIR)/ppc/gba_payload.c
 
@@ -113,11 +122,6 @@ gba-payload-sync:
 		echo "  vendor  ../gba/build/tester/tester_payload.c -> ppc/gba_payload.c"; \
 		sed 's/joypad_payload/gba_payload/g' "$(GBA_PAYLOAD_SRC)" > "$(GBA_PAYLOAD_OUT)"; \
 	fi
-
-#---------------------------------------------------------------------------------
-$(BUILD): gba-payload-sync
-	@[ -d $@ ] || mkdir -p $@
-	@$(MAKE) --no-print-directory -C $(BUILD) -f $(CURDIR)/Makefile
 
 #---------------------------------------------------------------------------------
 else

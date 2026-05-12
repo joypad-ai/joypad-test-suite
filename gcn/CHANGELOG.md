@@ -1,9 +1,24 @@
 # Joypad Tester — GameCube — Changelog
 
-Brief per-version diffs. Full release-notes detail lives under
-[`releases/`](releases/).
-
 ## v1.0.0 — 2026-05-11
 
-Initial release. Full feature breakdown:
-[`releases/v1.0.0.md`](releases/v1.0.0.md).
+First release.
+
+### Highlights
+
+- Live multi-port readout for all four SI ports simultaneously.
+- GameCube controllers (wired + WaveBird), N64 controllers / mice /
+  mics via passive adapter, and the GameCube ASCII keyboard.
+- N64 accessory pak detection — Memory / Rumble / Transfer / Bio
+  Sensor (with live BPM) / Snap Station.
+- GBA-over-Link-Cable multiboot upload + per-button passthrough.
+- Idle screensaver: bouncing logo bitmap, 7-color wall-bounce cycle.
+
+### Artifacts
+
+- `joypad_tester_v1.0.0_gamecube.dol` — Swiss / GC Loader / FlippyDrive
+- `joypad_tester_v1.0.0_wii.dol` — Wii Homebrew Channel
+- `opening.bnr` — Swiss boot banner
+
+Full feature breakdown + build / flashing instructions in
+[`gcn/README.md`](https://github.com/joypad-ai/joypad-tester/blob/main/gcn/README.md).

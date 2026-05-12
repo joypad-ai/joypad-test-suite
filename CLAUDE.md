@@ -66,11 +66,10 @@ subdirs" list.
 | File          | Purpose                                                       |
 |---------------|---------------------------------------------------------------|
 | `VERSION`     | Bare semver string. Must match the release tag (see below).   |
-| `CHANGELOG.md`| Brief per-version diff index. Header `## v<semver> — <date>`, 2-5 bullet lines per version, link to the matching `releases/v<ver>.md`. |
+| `CHANGELOG.md`| Per-version release notes. One section per release, header `## v<semver> — <date>`, body = 1-paragraph summary + 3-6 Highlights bullets + an Artifacts list + a link to README for full detail. The matching section is extracted verbatim and used as the GitHub Release body. |
 | `LICENSE.md`  | Whatever the upstream code's licence is (zlib, MIT, …).        |
-| `README.md`   | Audience-facing overview: what the app is, how to build, how to embed. |
+| `README.md`   | Audience-facing overview: what the app is, how to build, how to embed. The long-form feature breakdown lives here, not in the changelog. |
 | `Makefile`    | Build entrypoint. Use a Docker-based toolchain if it eases CI. |
-| `releases/v<ver>.md` | Short release notes for that version (used verbatim as the GitHub Release body — keep it scannable: 1-paragraph summary, 3-6 highlight bullets, an Artifacts list, and a link to the per-console README for full detail). |
 
 ### README structure (every console subdir)
 
@@ -172,24 +171,20 @@ the pretty name in the `parse` job.
 To cut, e.g., `gba-v1.1.0`:
 
 1. Bump `<console>/VERSION` to `1.1.0`.
-2. Write the short release notes to `<console>/releases/v1.1.0.md`
-   (this is what end-users see as the GitHub Release body — scannable
-   summary + 3-6 highlight bullets + Artifacts list + a link to the
-   per-console README for full detail). Long-form feature breakdowns
-   belong in README.md, not here.
-3. Prepend a short section to `<console>/CHANGELOG.md`:
-   `## v1.1.0 — YYYY-MM-DD`, 2-5 bullets summarising the diff,
-   and a link to `releases/v1.1.0.md` for the release-page form.
-4. Commit + push to `main`.
-5. Tag `<console>-v1.1.0` and push the tag.
-6. CI parses the tag, verifies VERSION, builds, and publishes the
-   GitHub Release with artifacts + `releases/v1.1.0.md` as the body
-   (falls back to the CHANGELOG section if the release-notes file
-   doesn't exist).
+2. Prepend a section to `<console>/CHANGELOG.md`:
+   `## v1.1.0 — YYYY-MM-DD`, 1-paragraph summary, 3-6 Highlights
+   bullets, an Artifacts list, and a link to the per-console README
+   for the full feature breakdown. This section is what end-users
+   see as the GitHub Release body — keep it scannable. Long-form
+   feature detail belongs in README.md, not in the changelog.
+3. Commit + push to `main`.
+4. Tag `<console>-v1.1.0` and push the tag.
+5. CI parses the tag, verifies VERSION, builds, and publishes the
+   GitHub Release with artifacts + the matching CHANGELOG section
+   as the body.
 
 If `VERSION` doesn't match the tag, the release fails (intentional —
-forces the changelog/release-notes/version-bump commits to land
-before the tag).
+forces the changelog/version-bump commits to land before the tag).
 
 ## Top-level README
 

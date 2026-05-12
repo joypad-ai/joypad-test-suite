@@ -154,18 +154,12 @@ jobs:
           cp build/joypad-tester.pce "_release/joypad_tester_v${VERSION}.pce"
           ls -la _release/
 
-      - name: Resolve release body
+      - name: Extract release body from CHANGELOG
         id: notes
         working-directory: ${{ needs.parse.outputs.console }}
         run: |
           VERSION="${{ needs.parse.outputs.version }}"
-          NOTES="releases/v${VERSION}.md"
-          # Per-version detail file is the canonical release body. If
-          # it's missing, fall back to extracting the matching section
-          # from CHANGELOG.md so the workflow still produces *something*.
-          if [ -f "$NOTES" ]; then
-            cp "$NOTES" _notes.md
-          elif [ -f CHANGELOG.md ]; then
+          if [ -f CHANGELOG.md ]; then
             awk -v ver="v$VERSION" '
               /^## / {
                 if (capture) exit

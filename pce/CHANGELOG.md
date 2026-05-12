@@ -1,9 +1,25 @@
 # Joypad Tester — PC Engine — Changelog
 
-Brief per-version diffs. Full release-notes detail lives under
-[`releases/`](releases/).
-
 ## v1.0.0 — 2026-05-11
 
-Initial release. Full feature breakdown:
-[`releases/v1.0.0.md`](releases/v1.0.0.md).
+First release. Builds on dshadoff's `PCE_Mouse_Test` baseline,
+extended with a labelled main screen and a screensaver matching the
+GameCube and GBA testers.
+
+### Highlights
+
+- Live P1..P5 readout — single pad or up to five via multitap.
+- PC Engine mouse: `mouse_exists()` flag, per-frame deltas, and a
+  running absolute X / Y accumulator. **I** button / right-click
+  toggles mouse-decoded mode (same toggle as upstream).
+- Idle screensaver: 64x64 joypad logo sprite bouncing in 7-color
+  wall-bounce cycle, matching the GameCube and GBA testers.
+
+### Artifacts
+
+- `joypad_tester_v1.0.0.pce` — drop onto an EverDrive PCE / Turbo
+  EverDrive / Krikzz SSDS3 / etc. (vanilla HuCard image, no copier
+  header).
+
+Full feature breakdown + HuC toolchain notes in
+[`pce/README.md`](https://github.com/joypad-ai/joypad-tester/blob/main/pce/README.md).

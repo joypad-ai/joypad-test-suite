@@ -125,11 +125,10 @@ python3 buildtools/make_banner.py opening.bnr
 
 ## Loading on hardware
 
-### GameCube (Swiss / GC Loader / FlippyDrive / SD2SP2)
+### GameCube — SD-card loaders (Swiss / GC Loader / FlippyDrive / SD2SP2)
 
 Grab `joypad_tester_v<ver>_gcn.zip` from the release and extract it
-to your SD root. The archive already contains the Swiss-ready folder
-layout, so you'll end up with:
+to your SD root. The archive contains the Swiss-ready folder layout:
 
 ```
 SD root/
@@ -140,6 +139,20 @@ SD root/
 
 Swiss reads `opening.bnr` and shows the banner image + description in
 its file browser; selecting the folder runs `default.dol`.
+
+### GameCube — bootable disc image / Dolphin / IPL-replacement modchips
+
+Grab `joypad_tester_v<ver>_gcn.iso` for a bootable iso9660 + El
+Torito disc image. Works for:
+
+- Dolphin (File → Open the `.iso`, or drag-drop)
+- DVD-R burn for IPL-replacement modchips (GCOS, Swiss-as-IPL, etc.)
+- ODE flash carts that prefer disc images over folder layouts
+
+The ISO uses bushing's open-source homebrew apploader
+([gcn/buildtools/apploader/](buildtools/apploader/)) — the binary
+content is the same `default.dol` + `opening.bnr` as the ZIP, just
+in disc form.
 
 ### Wii (Homebrew Channel)
 
@@ -153,16 +166,10 @@ Tagged as `gcn-v<semver>` from the repo root — see
 [`gcn/CHANGELOG.md`](CHANGELOG.md) for per-version notes. The release
 workflow attaches:
 
-- `joypad_tester_v<semver>_gcn.zip` — pre-built Swiss folder layout
-  (extract to SD root, boot via Swiss).
-- `joypad_tester_v<semver>_wii.dol` — bare Wii build for Homebrew
-  Channel.
-
-(In-tree build outputs are `joypad-tester-gamecube.dol`,
-`joypad-tester-wii.dol`, and `opening.bnr` — release staging renames
-the GC `.dol` to `default.dol`, bundles it with the banner, and zips
-the result; the Wii `.dol` gets a flash-cart-friendly name and ships
-loose.)
+- `joypad_tester_v<semver>_gcn.zip` — pre-built Swiss folder layout.
+- `joypad_tester_v<semver>_gcn.iso` — bootable disc image (homebrew
+  apploader + `.dol` + banner, composed with `mkisofs`).
+- `joypad_tester_v<semver>_wii.dol` — bare Wii build.
 
 ## Origin / credits
 

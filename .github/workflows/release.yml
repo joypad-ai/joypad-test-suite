@@ -89,7 +89,7 @@ jobs:
             -w /workspace/${{ needs.parse.outputs.console }} \
             -u "$(id -u):$(id -g)" \
             ghcr.io/extremscorner/libogc2:latest \
-            bash -c "apt-get install -y -qq --no-install-recommends -t bookworm-backports xorriso 2>/dev/null; TARGET_CONSOLE=gamecube make && TARGET_CONSOLE=wii make"
+            bash -c "TARGET_CONSOLE=gamecube make && TARGET_CONSOLE=wii make"
 
       - name: Build (GBA — both variants)
         if: needs.parse.outputs.console == 'gba'
@@ -116,24 +116,44 @@ jobs:
         if: needs.parse.outputs.console == 'gcn'
         working-directory: ${{ needs.parse.outputs.console }}
         run: |
-          # Two release artifacts:
+          # Three release artifacts:
           #   joypad_tester_v<ver>_gcn.zip -- pre-built Swiss folder
           #     layout for GC SD-card loaders (FlippyDrive, GC Loader,
-          #     SD2SP2, etc.). Contains:
-          #       Joypad Tester/
-          #         default.dol  (renamed from joypad-tester-gamecube.dol;
-          #                       Swiss looks for this filename)
-          #         opening.bnr  (Swiss banner, required by name)
+          #     SD2SP2, etc.). Contains Joypad Tester/{default.dol,
+          #     opening.bnr}, ready to drop on an SD root.
+          #   joypad_tester_v<ver>_gcn.iso -- bootable iso9660 + El
+          #     Torito disc image (homebrew apploader from
+          #     buildtools/apploader/gbi.hdr + the GC .dol renamed to
+          #     bootldr.dol + opening.bnr in the file tree). Suitable
+          #     for DVD-R burn / IPL-replacement modchips / Dolphin /
+          #     ODE flash carts that prefer ISO over folder layout.
           #   joypad_tester_v<ver>_wii.dol -- bare Wii build for the
           #     Homebrew Channel.
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends genisoimage
           VERSION="${{ needs.parse.outputs.version }}"
           mkdir -p _release
           if [ -f joypad-tester-gamecube.dol ] && [ -f opening.bnr ]; then
+            # Swiss-folder ZIP
             mkdir -p "_stage/Joypad Tester"
             cp joypad-tester-gamecube.dol "_stage/Joypad Tester/default.dol"
             cp opening.bnr                "_stage/Joypad Tester/opening.bnr"
             (cd _stage && zip -r "../_release/joypad_tester_v${VERSION}_gcn.zip" "Joypad Tester")
-            rm -rf _stage
+
+            # Bootable ISO: bushing's open-source apploader (gbi.hdr,
+            # vendored in buildtools/apploader/) wraps a bootldr.dol +
+            # any extra disc-tree files. mkisofs composes the
+            # iso9660 image with the El Torito boot extension.
+            rm -rf _iso_stage
+            mkdir -p _iso_stage
+            cp joypad-tester-gamecube.dol _iso_stage/bootldr.dol
+            cp opening.bnr                _iso_stage/opening.bnr
+            mkisofs -R -J -G buildtools/apploader/gbi.hdr \
+                    -no-emul-boot -b bootldr.dol \
+                    -o "_release/joypad_tester_v${VERSION}_gcn.iso" \
+                    _iso_stage/
+
+            rm -rf _stage _iso_stage
           fi
           [ -f joypad-tester-wii.dol ] && cp joypad-tester-wii.dol "_release/joypad_tester_v${VERSION}_wii.dol"
           ls -la _release/

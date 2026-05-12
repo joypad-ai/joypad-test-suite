@@ -36,15 +36,6 @@ Subdirs use short 3-letter codenames (`gcn`, `gba`, `pce`, future
 `n64`/`snes`/…) matching homebrew-community conventions. Release tags
 follow the same prefix: `<codename>-v<semver>`.
 
-## Per-console
-
-Each console subdir has its own `README.md` with what its app tests,
-how to build/flash, and any embedding notes. See:
-
-- [`gcn/README.md`](gcn/README.md)
-- [`gba/README.md`](gba/README.md)
-- [`pce/README.md`](pce/README.md)
-
 ## Acknowledgements
 
 Each console app has its own lineage. As more consoles join, this list grows.

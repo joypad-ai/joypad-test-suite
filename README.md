@@ -2,9 +2,9 @@
 
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="branding/logo_solid.svg">
-    <source media="(prefers-color-scheme: light)" srcset="branding/logo_solid_black.svg">
-    <img alt="Joypad Tester" src="branding/logo_solid_black.svg" width="300">
+    <source media="(prefers-color-scheme: dark)" srcset="assets/logo_solid.svg">
+    <source media="(prefers-color-scheme: light)" srcset="assets/logo_solid_black.svg">
+    <img alt="Joypad Tester" src="assets/logo_solid_black.svg" width="300">
   </picture>
 </p>
 <p align="center">

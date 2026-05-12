@@ -2,9 +2,9 @@
 """Generate ppc/gen_logo.h: a 1-bit alpha mask of the joypad logo for the
 screensaver.
 
-Source: branding/screensaver-logo.png (preferred) or
-        branding/logo.png (fallback) or
-        ../../branding/logo_solid.png (joypad shared)
+Source: assets/screensaver-logo.png (preferred) or
+        assets/logo.png (fallback) or
+        ../../assets/logo_solid.png (joypad shared)
 
 The mask gets rendered each frame in the cycle color so the screensaver
 can color-shift on every wall bounce while the silhouette stays crisp.
@@ -42,8 +42,8 @@ PROJECT = HERE.parent
 OUT = PROJECT / 'ppc' / 'gen_logo.h'
 
 CANDIDATES = [
-    PROJECT / 'branding' / 'screensaver-logo.png',
-    PROJECT / 'branding' / 'logo.png',
+    PROJECT / 'assets' / 'screensaver-logo.png',
+    PROJECT / 'assets' / 'logo.png',
 ]
 
 

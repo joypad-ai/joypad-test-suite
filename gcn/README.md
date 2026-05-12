@@ -8,7 +8,7 @@ keyboard.
 ## What it tests
 
 <p align="center">
-  <img src="branding/screenshot.png" alt="GameCube Joypad Tester running in Dolphin showing GCN on Port 1, GBA-multiboot on Port 2, ASCII keyboard on Port 3, and N64 controller with Rumble Pak on Port 4" width="600">
+  <img src="assets/screenshot.png" alt="GameCube Joypad Tester running in Dolphin showing GCN on Port 1, GBA-multiboot on Port 2, ASCII keyboard on Port 3, and N64 controller with Rumble Pak on Port 4" width="600">
 </p>
 
 All four SI ports rendered live, simultaneously, with no active-port toggle.
@@ -115,8 +115,8 @@ CI builds both targets on every push to `main` (see
 ## Banner
 
 `opening.bnr` (the file Swiss displays when browsing the folder) is generated
-from `branding/banner.png` by `buildtools/make_banner.py`. Edit
-`branding/banner.png` (96×32, RGB or RGBA — alpha composites onto black) and
+from `assets/banner.png` by `buildtools/make_banner.py`. Edit
+`assets/banner.png` (96×32, RGB or RGBA — alpha composites onto black) and
 re-run:
 
 ```

@@ -2,7 +2,7 @@
 """Generate src/gen_logo.h: the joypad logo as 4x 32x32 PCE sprite quadrants.
 
 Reads the same source PNG as gcn/buildtools/make_logo.py
-(../gcn/branding/logo.png) so the bouncing logo looks identical across
+(../gcn/assets/logo.png) so the bouncing logo looks identical across
 consoles. Each quadrant is encoded in PCE 4bpp planar format using a
 1-bit alpha mask (foreground = palette index 1, background = 0 /
 transparent). The PCE side cycles palette color 1 on each wall bounce
@@ -23,18 +23,18 @@ LOGO_H = 64
 SCRIPT = Path(__file__).resolve()
 PCE_ROOT = SCRIPT.parent.parent           # pce/
 REPO_ROOT = PCE_ROOT.parent               # joypad-tester/
-JOYPAD_BRANDING = REPO_ROOT.parent / "branding"   # joypad/branding/
+JOYPAD_BRANDING = REPO_ROOT.parent / "assets"   # joypad/assets/
 
 # Search paths (highest priority first). A hand-edited 64x64 PNG in
-# pce/branding/ wins outright -- treat it as the ground-truth pixel
+# pce/assets/ wins outright -- treat it as the ground-truth pixel
 # art and skip the scale-from-vector pipeline. SVG/large PNG sources
 # only kick in when there's no hand-edit yet.
 LOGO_PATHS = [
-    PCE_ROOT / "branding" / "logo_64.png",
+    PCE_ROOT / "assets" / "logo_64.png",
     JOYPAD_BRANDING / "logo_solid.svg",
     JOYPAD_BRANDING / "logo_solid.png",
-    PCE_ROOT / "branding" / "logo.png",
-    REPO_ROOT / "gcn" / "branding" / "logo.png",
+    PCE_ROOT / "assets" / "logo.png",
+    REPO_ROOT / "gcn" / "assets" / "logo.png",
 ]
 
 

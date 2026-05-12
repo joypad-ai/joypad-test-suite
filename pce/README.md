@@ -8,7 +8,7 @@ Engine mouse.
 ## What it tests
 
 <p align="center">
-  <img src="branding/screenshot.png" alt="PC Engine Joypad Tester main screen: yellow 'Joypad Tester - PC Engine' title, white live P1..P5 + Mouse + abs x/y readouts in two columns, cyan 'Press I button or right-click to toggle mouse mode.' footer" width="600">
+  <img src="assets/screenshot.png" alt="PC Engine Joypad Tester main screen: yellow 'Joypad Tester - PC Engine' title, white live P1..P5 + Mouse + abs x/y readouts in two columns, cyan 'Press I button or right-click to toggle mouse mode.' footer" width="600">
 </p>
 
 Each of the five potential joypad slots (single pad on port 0, or up to

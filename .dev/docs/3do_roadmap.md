@@ -58,7 +58,7 @@ specific page(s) in the per-port renderer comment headers.
 
 Match the GameCube tester's top-of-screen branded layout: small
 joypad logo to the left of the "Joypad Tester - 3DO" title, rendered
-as a sprite/cel. Asset comes from `joypad/branding/logo_solid.svg`
+as a sprite/cel. Asset comes from `joypad/assets/logo_solid.svg`
 (or a 3DO-friendly resized derivative), converted to 3DO's CEL
 format via the devkit's `pcxtocel` tool (or equivalent).
 
@@ -67,7 +67,7 @@ format via the devkit's `pcxtocel` tool (or equivalent).
 Replace the devkit's default banner.png with our own Joypad-branded
 splash. The 3DO BIOS reads the splash from the disc's TAKEME/banner
 area; bake-in is handled by the devkit's `3doiso` step. Source
-asset: `joypad/branding/` (same as other consoles), exported as a
+asset: `joypad/assets/` (same as other consoles), exported as a
 3DO-friendly 320x240 image.
 
 ### 5. Bouncing-logo idle screensaver

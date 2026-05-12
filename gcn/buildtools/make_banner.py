@@ -12,10 +12,10 @@ from PIL import Image, ImageDraw, ImageFont, ImageOps
 
 W, H = 96, 32
 
-# If branding/banner.png exists in this gamecube/ dir, it's used verbatim
+# If assets/banner.png exists in this gamecube/ dir, it's used verbatim
 # (must be 96x32 RGB/RGBA). Otherwise we render one procedurally from the
 # logo + a "Joypad" title.
-BRANDING_DIR = Path(__file__).parent.parent / 'branding'
+BRANDING_DIR = Path(__file__).parent.parent / 'assets'
 BANNER_PNG = BRANDING_DIR / 'banner.png'
 LOGO_PATH = BRANDING_DIR / 'logo.png'
 

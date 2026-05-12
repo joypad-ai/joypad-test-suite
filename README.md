@@ -15,7 +15,7 @@
 </p>
 <p align="center">
   <a href="https://github.com/joypad-ai/joypad-tester/releases"><img src="https://img.shields.io/github/downloads/joypad-ai/joypad-tester/total?style=for-the-badge&label=Downloads" alt="Downloads" /></a>
-  <a href="https://github.com/joypad-ai/joypad-tester/blob/main/LICENSE.md"><img src="https://img.shields.io/github/license/joypad-ai/joypad-tester?style=for-the-badge" alt="License" /></a>
+  <a href="https://github.com/joypad-ai/joypad-tester/blob/main/LICENSE.md"><img src="https://img.shields.io/badge/License-MIT-blue?style=for-the-badge" alt="License" /></a>
   <a href="https://github.com/joypad-ai/joypad-tester/actions/workflows/verify-build.yml"><img src="https://img.shields.io/github/actions/workflow/status/joypad-ai/joypad-tester/verify-build.yml?style=for-the-badge&label=CI" alt="CI Status" /></a>
   <a href="http://community.joypad.ai/"><img src="https://img.shields.io/discord/1133112432684978256?style=for-the-badge&logo=discord&label=Discord" alt="Discord" /></a>
 </p>

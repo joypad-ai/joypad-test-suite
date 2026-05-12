@@ -32,15 +32,14 @@
 #include "operror.h"
 #include "types.h"
 
-#define MAX_PADS       8
-// Mouse counts in the wild:
-//   retail 3DO  -> 1 mouse (single mouse port on the console)
-//   arcade 3DO  -> 2 mice (M2 dual-cab cabinets)
-//   protocol    -> 4 max (no commercial hardware ships this many)
-// We poll up to 2 -- the realistic ceiling -- so empty slots beyond
-// don't add probe overhead each frame.
-#define MAX_MICE       2
-#define MAX_DEVICES    8          // daisy-chain hardware limit
+// The 3DO daisy-chain protocol caps at 8 devices total, regardless of
+// type mix. We use one constant for both the per-type probe ceiling
+// and the rendered list size -- you can't fit more than 8 of anything
+// even if every slot were the same class. Real-world mouse counts
+// (retail = 1, arcade = 2, protocol theoretical = 4) are bounded by
+// hardware; the kernel happily returns "no such device" for the
+// over-probes, so we don't need a tighter MAX_DEVICES.
+#define MAX_DEVICES    8
 #define IDLE_FRAMES    (60 * 30)
 #define SCREEN_W       320
 #define SCREEN_H       240
@@ -236,7 +235,7 @@ main (int argc_, char *argv_)
   BasicDisplay display;
   Err err;
 
-  err = InitEventUtility (MAX_PADS, MAX_MICE, 0);
+  err = InitEventUtility (MAX_DEVICES, MAX_DEVICES, 0);
   if (err < 0)
     abort_err (err);
 
@@ -262,7 +261,7 @@ main (int argc_, char *argv_)
       ControlPadEventData pad_data;
       MouseEventData      mouse_data;
 
-      for (int i = 0; i < MAX_PADS && detected < MAX_DEVICES; i++)
+      for (int i = 0; i < MAX_DEVICES && detected < MAX_DEVICES; i++)
         {
           Err rc = GetControlPad (i + 1, 0, &pad_data);
           if (rc < 0) continue;
@@ -273,7 +272,7 @@ main (int argc_, char *argv_)
           sig ^= pad_data.cped_ButtonBits + (i * 0x101);
           detected++;
         }
-      for (int i = 0; i < MAX_MICE && detected < MAX_DEVICES; i++)
+      for (int i = 0; i < MAX_DEVICES && detected < MAX_DEVICES; i++)
         {
           Err rc = GetMouse (i + 1, 0, &mouse_data);
           if (rc < 0) continue;

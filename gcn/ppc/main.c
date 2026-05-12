@@ -151,6 +151,7 @@ typedef enum {
   STYLE_GCN,
   STYLE_WAVEBIRD,
   STYLE_BONGO,
+  STYLE_DANCEMAT,
   STYLE_WHEEL,
   STYLE_MOUSE,
   STYLE_MIC,
@@ -164,6 +165,7 @@ static const char *format_style(pad_style_t s) {
   case STYLE_GCN:      return "GCN     ";
   case STYLE_WAVEBIRD: return "WaveBird";
   case STYLE_BONGO:    return "DK Bongo";
+  case STYLE_DANCEMAT: return "DanceMat";
   case STYLE_WHEEL:    return "Wheel   ";
   case STYLE_MOUSE:    return "Mouse   ";
   case STYLE_MIC:      return "Mic     ";
@@ -350,25 +352,38 @@ static void snap_n64(pad_snap_t *out, int chan, const N64State *s,
 }
 
 static void snap_gc(pad_snap_t *out, int p, u16 buttons) {
-  // libogc's SI_DecodeType test: when the wavebird-specific flag mix
-  // matches, this is an active wireless controller paired with its
-  // receiver. Otherwise it's a wired Standard GC controller.
   u32 t = SI_GetType(p);
-  out->style = ((t & SI_GC_WAVEBIRD) == SI_GC_WAVEBIRD) ? STYLE_WAVEBIRD
-                                                       : STYLE_GCN;
-  // DK Bongo (TaruKonga) shares the SI device type with a standard
-  // controller (0x09000000); libogc disambiguates by watching the
-  // PAD_USE_ORIGIN bit in the status report -- bongos never set it,
-  // so PAD_IsBarrel latches the channel as "barrel" (libogc's
-  // internal codename for the drum). Override the style after
-  // ScanPads has had a chance to set the barrel bit.
-  if (PAD_IsBarrel(p)) {
+  // Disambiguate the GC-controller-family variants from their SI
+  // device-type bits + libogc's barrel latch:
+  //   - DanceMat:  unique SI sub-type 0x09000300 (libogc doesn't ship
+  //                a constant for it; value matches Dolphin's
+  //                SI_DANCEMAT enum: SI_TYPE_GC | SI_GC_STANDARD |
+  //                0x00000300). Checked first because its sub-type
+  //                bits override the GCN/WaveBird heuristics.
+  //   - WaveBird:  paired wireless mix (SI_GC_WIRELESS | STANDARD |
+  //                STATE | FIX_ID).
+  //   - DK Bongo:  shares the SI device ID with a wired GCN; libogc
+  //                latches the channel as "barrel" via the
+  //                PAD_USE_ORIGIN status bit (bongos never assert it).
+  //                Checked after WaveBird so we don't accidentally
+  //                relabel a barrel-bit-set channel that's actually
+  //                a wireless pad whose origin hasn't synced yet.
+  //   - GCN:       fallback for everything else with SI_GC_STANDARD.
+  if ((t & 0x0000FF00) == 0x00000300) {
+    out->style = STYLE_DANCEMAT;
+  } else if ((t & SI_GC_WAVEBIRD) == SI_GC_WAVEBIRD) {
+    out->style = STYLE_WAVEBIRD;
+  } else if (PAD_IsBarrel(p)) {
     out->style = STYLE_BONGO;
+  } else {
+    out->style = STYLE_GCN;
   }
-  // Bongos and WaveBirds have no rumble motor; SI_GC_NOMOTOR is set
-  // in the wireless type for WaveBird. Standard GC controllers do
-  // have a motor.
-  out->rumble_supported = !(t & SI_GC_NOMOTOR) && out->style != STYLE_BONGO;
+  // No rumble motor on WaveBird (SI_GC_NOMOTOR set in the wireless
+  // type), bongos, or dance mats. Standard wired GC controllers have
+  // it built in.
+  out->rumble_supported = !(t & SI_GC_NOMOTOR) &&
+                          out->style != STYLE_BONGO &&
+                          out->style != STYLE_DANCEMAT;
   out->stick_x = PAD_StickX(p);
   out->stick_y = PAD_StickY(p);
   out->cstick_x = PAD_SubStickX(p);

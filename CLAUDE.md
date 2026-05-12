@@ -53,6 +53,12 @@ Existing console subdirs at time of writing:
   Detects 2-button / 6-button pads and the PCE mouse via the standard
   joypad port + multitap. Origin: MIT (dshadoff PCE_Mouse_Test);
   `pce/LICENSE.md`.
+- `3do/` — 3DO Opera test app (trapexit/3do-devkit-based, builds
+  iso9660 .iso). Reads the daisy-chain control pad and renders live
+  button state. Origin: MIT (original src/main.cpp) + ISC for the
+  vendored devkit helpers; `3do/LICENSE.md`. Toolchain is Linux-only
+  x86 binaries running under `--platform=linux/amd64` in the build
+  container, so Docker is mandatory for this subdir.
 
 ## Console subdir conventions
 

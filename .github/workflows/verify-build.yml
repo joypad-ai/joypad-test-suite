@@ -37,6 +37,12 @@ jobs:
             image: ""
             artifacts: |
               pce/build/joypad-tester.pce
+          - console: 3do
+            # trapexit/3do-devkit cloned at pinned commit inside
+            # 3do/buildtools/Dockerfile -- see the Build (3DO) step.
+            image: ""
+            artifacts: |
+              3do/build/joypad-tester.iso
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -103,6 +109,30 @@ jobs:
             -u "$(id -u):$(id -g)" \
             joypad-tester-huc:ci \
             make
+
+      - name: Build (3DO)
+        if: matrix.console == '3do'
+        run: |
+          # ubuntu-latest is x86_64, so the --platform=linux/amd64 in
+          # the Dockerfile is a no-op (no emulation needed). The
+          # devkit + i386/wine setup gets cached in the image so only
+          # the first run is slow.
+          cd 3do
+          mkdir -p build .wine-home
+          docker build --platform=linux/amd64 -t joypad-tester-3do:ci buildtools/
+          docker run --rm \
+            --platform=linux/amd64 \
+            -v "$(pwd):/work" \
+            -u "$(id -u):$(id -g)" \
+            -e HOME=/work/.wine-home \
+            joypad-tester-3do:ci \
+            bash -c "
+              set -e
+              cp /work/src/main.cpp /opt/3do-devkit/src/main.cpp
+              cd /opt/3do-devkit
+              make NAME=joypad-tester
+              cp iso/joypad-tester.iso /work/build/joypad-tester.iso
+            "
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4

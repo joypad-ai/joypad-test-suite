@@ -36,6 +36,7 @@ jobs:
             snes)     PRETTY="Super Nintendo" ;;
             gba)      PRETTY="Game Boy Advance" ;;
             pce)      PRETTY="PC Engine" ;;
+            3do)      PRETTY="3DO" ;;
             *)        PRETTY="$CONSOLE" ;;
           esac
           echo "console=$CONSOLE" >> "$GITHUB_OUTPUT"
@@ -112,6 +113,26 @@ jobs:
             joypad-tester-huc:release \
             make
 
+      - name: Build (3DO)
+        if: needs.parse.outputs.console == '3do'
+        run: |
+          cd 3do
+          mkdir -p build .wine-home
+          docker build --platform=linux/amd64 -t joypad-tester-3do:release buildtools/
+          docker run --rm \
+            --platform=linux/amd64 \
+            -v "$(pwd):/work" \
+            -u "$(id -u):$(id -g)" \
+            -e HOME=/work/.wine-home \
+            joypad-tester-3do:release \
+            bash -c "
+              set -e
+              cp /work/src/main.cpp /opt/3do-devkit/src/main.cpp
+              cd /opt/3do-devkit
+              make NAME=joypad-tester
+              cp iso/joypad-tester.iso /work/build/joypad-tester.iso
+            "
+
       - name: Stage release artifacts (GameCube)
         if: needs.parse.outputs.console == 'gcn'
         working-directory: ${{ needs.parse.outputs.console }}
@@ -183,6 +204,16 @@ jobs:
           VERSION="${{ needs.parse.outputs.version }}"
           mkdir -p _release
           cp build/joypad-tester.pce "_release/joypad_tester_v${VERSION}.pce"
+          ls -la _release/
+
+      - name: Stage release artifacts (3DO)
+        if: needs.parse.outputs.console == '3do'
+        working-directory: 3do
+        run: |
+          # Single .iso artifact; emulators + flash-friendly burn target.
+          VERSION="${{ needs.parse.outputs.version }}"
+          mkdir -p _release
+          cp build/joypad-tester.iso "_release/joypad_tester_v${VERSION}_3do.iso"
           ls -la _release/
 
       - name: Build release body

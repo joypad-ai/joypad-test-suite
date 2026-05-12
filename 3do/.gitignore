@@ -1,0 +1,4 @@
+build/
+_release/
+.wine-home/
+.DS_Store

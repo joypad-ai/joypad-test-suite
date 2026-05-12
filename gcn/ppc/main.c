@@ -145,6 +145,19 @@ static void xfb_draw_title(u32 *fb_words, int fb_pitch_words) {
 static void *xfb = NULL;
 static GXRModeObj *rMode = NULL;
 
+// GC-family sub-type sticky caches. The base gc_chan (live in main())
+// latches as soon as libogc reports a standard GC controller variant
+// on a channel. These narrower caches identify which variant once
+// gc_chan is hot, and stay sticky for ~30 frames after the evidence
+// disappears so the brief disconnect transient -- when PAD_IsBarrel
+// drops and the dance-mat sub-type bits clear, but gc_chan's own
+// counter hasn't expired yet -- doesn't flash the port label to
+// "GCN" on the way to "None".
+static bool bongo_chan[4]            = {false, false, false, false};
+static u8   bongo_chan_misses[4]     = {0};
+static bool dancemat_chan[4]         = {false, false, false, false};
+static u8   dancemat_chan_misses[4]  = {0};
+
 typedef enum {
   STYLE_NONE,
   STYLE_N64,
@@ -179,28 +192,40 @@ static const char *format_style(pad_style_t s) {
 // firmware (src/lib/joybus-pio/include/gamecube_definitions.h), originally
 // reverse-engineered from PSO's keymap.
 static const char *gc_key_label(u8 sc) {
+  // Dynamic labels (single-letter, single-digit, F-keys) need to come
+  // out of a rotating buffer pool. The keyboard poll picks up to three
+  // held keys per frame, and main() calls gc_key_label thrice in a row
+  // to format k0/k1/k2 before a single printf. A single shared static
+  // char buf[] would make all three pointers alias the last call's
+  // contents -- which is exactly the "three held keys all display as
+  // the last one" bug we hit. Four slots is one more than the
+  // three-key rollover limit, so even if the static labels also routed
+  // through here we wouldn't collide within one frame.
+  static char pool[4][6];
+  static int pidx = 0;
+
   if (sc == 0) return "-";
   if (sc >= 0x10 && sc <= 0x29) {
     static const char letters[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-    static char buf[2];
-    buf[0] = letters[sc - 0x10];
-    buf[1] = 0;
-    return buf;
+    char *out = pool[pidx]; pidx = (pidx + 1) & 3;
+    out[0] = letters[sc - 0x10];
+    out[1] = 0;
+    return out;
   }
   if (sc >= 0x2a && sc <= 0x33) {
     static const char digits[] = "1234567890";
-    static char buf[2];
-    buf[0] = digits[sc - 0x2a];
-    buf[1] = 0;
-    return buf;
+    char *out = pool[pidx]; pidx = (pidx + 1) & 3;
+    out[0] = digits[sc - 0x2a];
+    out[1] = 0;
+    return out;
   }
   if (sc >= 0x40 && sc <= 0x4b) {
-    static char fbuf[4];
     int n = sc - 0x40 + 1;
-    fbuf[0] = 'F';
-    if (n < 10) { fbuf[1] = '0' + n; fbuf[2] = 0; }
-    else { fbuf[1] = '1'; fbuf[2] = '0' + (n - 10); fbuf[3] = 0; }
-    return fbuf;
+    char *out = pool[pidx]; pidx = (pidx + 1) & 3;
+    out[0] = 'F';
+    if (n < 10) { out[1] = '0' + n; out[2] = 0; }
+    else { out[1] = '1'; out[2] = '0' + (n - 10); out[3] = 0; }
+    return out;
   }
   switch (sc) {
   case 0x06: return "Home";
@@ -353,27 +378,27 @@ static void snap_n64(pad_snap_t *out, int chan, const N64State *s,
 
 static void snap_gc(pad_snap_t *out, int p, u16 buttons) {
   u32 t = SI_GetType(p);
-  // Disambiguate the GC-controller-family variants from their SI
-  // device-type bits + libogc's barrel latch:
-  //   - DanceMat:  unique SI sub-type 0x09000300 (libogc doesn't ship
-  //                a constant for it; value matches Dolphin's
-  //                SI_DANCEMAT enum: SI_TYPE_GC | SI_GC_STANDARD |
-  //                0x00000300). Checked first because its sub-type
-  //                bits override the GCN/WaveBird heuristics.
-  //   - WaveBird:  paired wireless mix (SI_GC_WIRELESS | STANDARD |
-  //                STATE | FIX_ID).
-  //   - DK Bongo:  shares the SI device ID with a wired GCN; libogc
-  //                latches the channel as "barrel" via the
-  //                PAD_USE_ORIGIN status bit (bongos never assert it).
-  //                Checked after WaveBird so we don't accidentally
-  //                relabel a barrel-bit-set channel that's actually
-  //                a wireless pad whose origin hasn't synced yet.
-  //   - GCN:       fallback for everything else with SI_GC_STANDARD.
-  if ((t & 0x0000FF00) == 0x00000300) {
+  // Disambiguate the GC-controller-family variants:
+  //   - DanceMat: sticky cache populated when SI sub-type 0x00000300
+  //               is observed (matches Dolphin's SI_DANCEMAT).
+  //   - WaveBird: paired wireless mix (SI_GC_WIRELESS | STANDARD |
+  //               STATE | FIX_ID). Read directly because the bits are
+  //               part of the cached SI type, which is itself sticky.
+  //   - DK Bongo: sticky cache populated when PAD_IsBarrel observed
+  //               the PAD_USE_ORIGIN-clear status bit (bongos share
+  //               the standard GC controller's SI device ID, so this
+  //               is the only way to distinguish).
+  //   - GCN:      fallback for plain standard GC controllers.
+  //
+  // Caches are checked before live evidence so that on disconnect
+  // the variant label persists for the same ~30 frames as gc_chan
+  // does -- otherwise the port label flashes "GCN" between the
+  // variant-evidence drop and gc_chan finally clearing.
+  if (dancemat_chan[p]) {
     out->style = STYLE_DANCEMAT;
   } else if ((t & SI_GC_WAVEBIRD) == SI_GC_WAVEBIRD) {
     out->style = STYLE_WAVEBIRD;
-  } else if (PAD_IsBarrel(p)) {
+  } else if (bongo_chan[p]) {
     out->style = STYLE_BONGO;
   } else {
     out->style = STYLE_GCN;
@@ -597,30 +622,86 @@ int main(int argc, char **argv) {
     // Require SI_GC_STANDARD + no NO_RESPONSE to set; clear on any
     // definitive non-controller GC reading or NORESP.
     static bool gc_chan[4] = {false, false, false, false};
+    // Per-cache miss counters. We need sticky-cache semantics so a
+    // single BUSY/transient frame doesn't flicker the port label, but
+    // pure "clear on NO_RESPONSE or definitive other-type" couldn't
+    // shed a disconnect that settled into a steady BUSY (hi==0, no
+    // SI_GC_* bits, no NO_RESPONSE) -- the port label kept the old
+    // device name long after the controller was pulled. Counters
+    // increment on every non-fresh read; caches clear after 30 frames
+    // (~0.5s @60Hz) on top of the immediate clear conditions.
+    static u8 kbd_chan_misses[4]   = {0};
+    static u8 wheel_chan_misses[4] = {0};
+    static u8 gc_chan_misses[4]    = {0};
     for (int i = 0; i < 4; i++) {
       u32 t = SI_GetType(i);
       u32 hi = (t & ~0xffff) & ~0x001F0000;
-      if (hi == SI_GC_KEYBOARD) kbd_chan[i] = true;
-      // Also clear if libogc decisively reports something other than keyboard
-      // (e.g. NORESP for an empty port, GC_CONTROLLER for a swapped pad).
-      else if ((t & SI_ERROR_NO_RESPONSE) ||
-               (hi != 0 && (t & SI_TYPE_MASK) == SI_TYPE_GC)) {
-        kbd_chan[i] = false;
+
+      // ---- Keyboard sticky-cache ----
+      if (hi == SI_GC_KEYBOARD && !(t & SI_ERROR_NO_RESPONSE)) {
+        kbd_chan[i] = true;
+        kbd_chan_misses[i] = 0;
+      } else {
+        if (kbd_chan_misses[i] < 255) kbd_chan_misses[i]++;
+        if ((t & SI_ERROR_NO_RESPONSE) ||
+            (hi != 0 && (t & SI_TYPE_MASK) == SI_TYPE_GC) ||
+            kbd_chan_misses[i] >= 30) {
+          kbd_chan[i] = false;
+        }
       }
+
+      // ---- Steering wheel sticky-cache ----
       if (hi == SI_GC_STEERING && !(t & SI_ERROR_NO_RESPONSE)) {
         wheel_chan[i] = true;
-      } else if ((t & SI_ERROR_NO_RESPONSE) ||
-                 (hi != SI_GC_STEERING && hi != 0 &&
-                  (t & SI_TYPE_MASK) == SI_TYPE_GC)) {
-        wheel_chan[i] = false;
+        wheel_chan_misses[i] = 0;
+      } else {
+        if (wheel_chan_misses[i] < 255) wheel_chan_misses[i]++;
+        if ((t & SI_ERROR_NO_RESPONSE) ||
+            (hi != SI_GC_STEERING && hi != 0 &&
+             (t & SI_TYPE_MASK) == SI_TYPE_GC) ||
+            wheel_chan_misses[i] >= 30) {
+          wheel_chan[i] = false;
+        }
       }
+
+      // ---- Standard GC controller sticky-cache ----
       if ((t & SI_TYPE_MASK) == SI_TYPE_GC && (t & SI_GC_STANDARD) &&
           !(t & SI_ERROR_NO_RESPONSE)) {
         gc_chan[i] = true;
-      } else if ((t & SI_ERROR_NO_RESPONSE) ||
-                 (hi != 0 && ((t & SI_TYPE_MASK) != SI_TYPE_GC ||
-                              !(t & SI_GC_STANDARD)))) {
-        gc_chan[i] = false;
+        gc_chan_misses[i] = 0;
+      } else {
+        if (gc_chan_misses[i] < 255) gc_chan_misses[i]++;
+        if ((t & SI_ERROR_NO_RESPONSE) ||
+            (hi != 0 && ((t & SI_TYPE_MASK) != SI_TYPE_GC ||
+                         !(t & SI_GC_STANDARD))) ||
+            gc_chan_misses[i] >= 30) {
+          gc_chan[i] = false;
+        }
+      }
+
+      // ---- DK Bongo sticky-cache (sub-classification within gc_chan) ----
+      // PAD_IsBarrel reflects libogc's barrel-bit latch from the most
+      // recent valid status read. On disconnect that bit clears
+      // immediately while gc_chan rides out its counter -- without a
+      // cache here the port label would flash GCN for a beat.
+      if (PAD_IsBarrel(i) && !(t & SI_ERROR_NO_RESPONSE)) {
+        bongo_chan[i] = true;
+        bongo_chan_misses[i] = 0;
+      } else {
+        if (bongo_chan_misses[i] < 255) bongo_chan_misses[i]++;
+        if (bongo_chan_misses[i] >= 30) bongo_chan[i] = false;
+      }
+
+      // ---- Dance Mat sticky-cache (sub-classification within gc_chan) ----
+      // Bits 8..15 = 0x03 is Dolphin's SI_DANCEMAT sub-type signature.
+      // The whole SI type drops to BUSY/NO_RESPONSE on disconnect, so
+      // cache it just like bongo_chan.
+      if ((t & 0x0000FF00) == 0x00000300 && !(t & SI_ERROR_NO_RESPONSE)) {
+        dancemat_chan[i] = true;
+        dancemat_chan_misses[i] = 0;
+      } else {
+        if (dancemat_chan_misses[i] < 255) dancemat_chan_misses[i]++;
+        if (dancemat_chan_misses[i] >= 30) dancemat_chan[i] = false;
       }
     }
 

@@ -67,7 +67,7 @@
 #define SCREEN_W       320
 #define SCREEN_H       240
 #define CYCLE_COUNT    7
-#define LOGO_W         64
+#define LOGO_W         66
 #define LOGO_H         64
 
 // Toggle for the broker-pipeline diagnostic status line. Pads work
@@ -208,6 +208,53 @@ static int       g_dbg_polled_mice  = 0;
 static int       g_dbg_pod_queries  = 0;   // count of EB_DescribePods we sent
 static int32     g_dbg_pod_result   = 1;   // msg_Result of last reply (1=never)
 static uint32    g_dbg_pod_flavor   = 0;   // ebh_Flavor of last reply payload
+
+// Keyboard "terminal" line: typed-text buffer + delta-detect state.
+// Shared across all keyboard pods on the chain (a single typing
+// stream, even if two keyboards were attached). Width is bounded by
+// what fits to the right of the prompt on a 320-pixel screen --
+// 8 px / char, "> " is 16 px starting at x=20, leaves 320-36 = 284 px
+// = 35 char cells.
+#define KB_TEXT_MAX        35
+static char      g_kb_text[KB_TEXT_MAX + 1] = { 0 };
+static int       g_kb_textlen = 0;
+static uint32    g_kb_prev_matrix[8] = { 0 };
+static uint32    g_kb_blink_frame    = 0;
+
+// PS/2 Set 2 scancode -> ASCII (unshifted). 0 = ignore key (modifier,
+// function key, unmapped). 0x08 = backspace (special-case: pop last
+// char from buffer). Source: 3DO host driverlet (KeyboardDriver.c)
+// decodes PS/2 Set 2 byte stream and stores press state in bit
+// `scancode` of ked_KeyMatrix (lower 128 bits = regular keys, upper
+// 128 = E0-prefixed extended keys which we ignore for terminal use).
+static const char PS2_TO_ASCII[128] = {
+  /* 0x00 */ 0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0, '`',  0,
+  /* 0x10 */ 0,   0,   0,   0,   0, 'q', '1',   0,   0,   0, 'z', 's', 'a', 'w', '2',  0,
+  /* 0x20 */ 0, 'c', 'x', 'd', 'e', '4', '3',   0,   0, ' ', 'v', 'f', 't', 'r', '5',  0,
+  /* 0x30 */ 0, 'n', 'b', 'h', 'g', 'y', '6',   0,   0,   0, 'm', 'j', 'u', '7', '8',  0,
+  /* 0x40 */ 0, ',', 'k', 'i', 'o', '0', '9',   0,   0, '.', '/', 'l', ';', 'p', '-',  0,
+  /* 0x50 */ 0,   0,'\'',   0, '[', '=',   0,   0,   0,   0,   0, ']',   0,'\\',   0,  0,
+  /* 0x60 */ 0,   0,   0,   0,   0,   0,0x08,   0,   0,   0,   0,   0,   0,   0,   0,  0,
+  /* 0x70 */ 0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,  0,
+};
+
+static void
+kb_consume_press (uint8 scancode)
+{
+  if (scancode >= 128) return;          /* E0 keys -- not handled */
+  char c = PS2_TO_ASCII[scancode];
+  if (c == 0) return;                   /* unmapped key */
+  if (c == 0x08)                        /* backspace */
+    {
+      if (g_kb_textlen > 0) g_kb_text[--g_kb_textlen] = 0;
+      return;
+    }
+  if (g_kb_textlen < KB_TEXT_MAX)
+    {
+      g_kb_text[g_kb_textlen++] = c;
+      g_kb_text[g_kb_textlen]   = 0;
+    }
+}
 
 
 // Two distinct outbound message items: one parks while the broker
@@ -618,7 +665,30 @@ apply_event_record (EventBrokerHeader *hdr, bool *needs_repodding)
         case EVENTNUM_KeyboardDataArrived:
           inferred = DEV_KEYBOARD;
           if (slot)
-            slot->kb = *(KeyboardEventData *)frame->ef_EventData;
+            {
+              KeyboardEventData *kbed = (KeyboardEventData *)frame->ef_EventData;
+              slot->kb = *kbed;
+              /* Terminal feed: detect bits that went 0 -> 1 since the
+               * last seen matrix and pipe each into the typed-text
+               * buffer. Only the lower 128 bits (regular keys); the
+               * upper 128 are E0-extended keys (arrows / ctrl / etc.)
+               * which the terminal doesn't consume. */
+              for (int w = 0; w < 4; w++)
+                {
+                  uint32 cur  = kbed->ked_KeyMatrix[w];
+                  uint32 down = cur & ~g_kb_prev_matrix[w];
+                  while (down)
+                    {
+                      int bit = 0;
+                      uint32 mask = down & (~down + 1);    /* lowest set bit */
+                      uint32 tmp  = mask;
+                      while (tmp >>= 1) bit++;
+                      kb_consume_press ((uint8)(w * 32 + bit));
+                      down ^= mask;
+                    }
+                  g_kb_prev_matrix[w] = cur;
+                }
+            }
           break;
 
         case EVENTNUM_ControlPortChange:
@@ -883,6 +953,17 @@ draw_keyboard_row (BasicDisplay &display, device_t *dev, int y)
       display.draw_text8 (x, y, buf);
       x += 24;
     }
+
+  /* Row 2: terminal-style typed-input line. Starts with "> " prompt,
+   * shows the typed buffer, and a blinking cursor (underscore) at
+   * the insertion point. Blink rate ~1 Hz (toggle every 30 frames at
+   * 60 fps). */
+  int y2 = y + 14;
+  display.draw_text8 (20, y2, "> ");
+  if (g_kb_textlen > 0)
+    display.draw_text8 (36, y2, g_kb_text);
+  if (((g_kb_blink_frame / 30) & 1) == 0)
+    display.draw_text8 (36 + g_kb_textlen * 8, y2, "_");
 }
 
 // SillyPad / Arcade buttons. Our SillyPadDriver decodes byte 1 of
@@ -1071,7 +1152,7 @@ draw_devices (BasicDisplay &display)
         case DEV_STICK:    draw_stick_row    (display, dev, y); rh = 28; break;
         case DEV_LIGHTGUN: draw_lightgun_row (display, dev, y); break;
         case DEV_ARCADE:   draw_arcade_row   (display, dev, y); break;
-        case DEV_KEYBOARD: draw_keyboard_row (display, dev, y); break;
+        case DEV_KEYBOARD: draw_keyboard_row (display, dev, y); rh = 28; break;
         default:           draw_generic_row  (display, dev, y); break;
         }
       y += rh;
@@ -1183,15 +1264,6 @@ main (int argc_, char *argv_)
    * being recolored even though only the background actually is. */
   CCB *logo_ccb = LoadCel ("LogoCel.cel", MEMTYPE_CEL);
   if (logo_ccb == NULL) abort_err (-1);
-  /* The source PNG is 64x64 (square), but a real 3DO joypad is
-   * wider than tall, so the silhouette looks squeezed at 1:1.
-   * Stretch horizontally by 1.5x at render time via the CCB's
-   * HDX (horizontal X delta, 12.20 fixed-point). 1.0 = 1<<20;
-   * 1.5x = 3<<19. Vertical scale stays 1.0. */
-  logo_ccb->ccb_HDX = 3 << 19;
-  /* Effective rendered width after the HDX scale -- bouncing
-   * uses this so the cel doesn't clip off the right edge. */
-  const int LOGO_W_RENDERED = (LOGO_W * 3) / 2;
 
   uint32 prev_sig    = 0;
   int    idle_count  = 0;
@@ -1284,10 +1356,10 @@ main (int argc_, char *argv_)
            * matching and we keep overwriting them in place. */
           ss_x += ss_dx;
           ss_y += ss_dy;
-          if (ss_x <= 0)                          { ss_x = 0;                          ss_dx = -ss_dx; ss_color = (ss_color + 1) % CYCLE_COUNT; }
-          if (ss_x >= SCREEN_W - LOGO_W_RENDERED) { ss_x = SCREEN_W - LOGO_W_RENDERED; ss_dx = -ss_dx; ss_color = (ss_color + 1) % CYCLE_COUNT; }
-          if (ss_y <= 0)                          { ss_y = 0;                          ss_dy = -ss_dy; ss_color = (ss_color + 1) % CYCLE_COUNT; }
-          if (ss_y >= SCREEN_H - LOGO_H)          { ss_y = SCREEN_H - LOGO_H;          ss_dy = -ss_dy; ss_color = (ss_color + 1) % CYCLE_COUNT; }
+          if (ss_x <= 0)                 { ss_x = 0;                 ss_dx = -ss_dx; ss_color = (ss_color + 1) % CYCLE_COUNT; }
+          if (ss_x >= SCREEN_W - LOGO_W) { ss_x = SCREEN_W - LOGO_W; ss_dx = -ss_dx; ss_color = (ss_color + 1) % CYCLE_COUNT; }
+          if (ss_y <= 0)                 { ss_y = 0;                 ss_dy = -ss_dy; ss_color = (ss_color + 1) % CYCLE_COUNT; }
+          if (ss_y >= SCREEN_H - LOGO_H) { ss_y = SCREEN_H - LOGO_H; ss_dy = -ss_dy; ss_color = (ss_color + 1) % CYCLE_COUNT; }
 
           uint16 sprite_color = 0x8000u | (uint16)CYCLE_RGB[ss_color];
           uint16 *src = (uint16 *)logo_ccb->ccb_SourcePtr;
@@ -1312,6 +1384,7 @@ main (int argc_, char *argv_)
 
       display.display_and_swap ();
       display.waitvbl ();
+      g_kb_blink_frame++;   /* drives the terminal-cursor blink */
     }
 
   // Unreachable in practice; cleanup is left to the OS on reset.

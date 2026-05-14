@@ -35,24 +35,80 @@ rethink — the current single-screen P1-only layout doesn't scale.
 
 Beyond the standard control pad, the 3DO supports:
 
-- **3DO Mouse** — X/Y movement, three buttons (L/M/R). API: separate
-  from `DoControlPad`; uses the event broker. Mouse-event packets
-  carry deltas and button mask. See https://3dodev.com/ docs on
-  ControlPad events and event-broker mouse-class IDs.
-- **Light Gun** — for games like Mad Dog McCree, Crime Patrol. Lives
-  on the same daisy-chain electrical interface but reports
-  (x, y, trigger) per event poll.
-- **SillyPad / arcade controllers** — variants that map to standard
-  pad bits but expose additional pins.
-- **Steering wheel** (Capcom CPS Changer-style) — niche, if anyone
-  actually shipped one.
+- **3DO Mouse** — X/Y movement, three buttons (L/M/R). PBUS class 0x49.
+- **3DO Flightstick** — H/V/D analog axes + 12 buttons. PBUS sig 0x01 0x7B 0x08.
+- **Light Gun** — counter-based aiming + trigger. PBUS class 0x4D.
+- **SillyPad / Arcade (Orbatak)** — coin / start / service buttons. PBUS class 0xC0.
+- **Steering wheel** — niche, if anyone actually shipped one.
 
-Per-port detection: probe each daisy-chain slot for its device-class
-ID and select the renderer accordingly. Display device-class label
-next to "P1/P2/.." (e.g., "P1: Mouse  x +12 y -8  L M R").
+Authoritative protocol docs live at
+https://3dodev.com/documentation/hardware/opera/pbus and mirrored at
+https://github.com/joypad-ai/joypad-os/blob/main/docs/protocols/3DO_PBUS.md.
 
-Authoritative device-type docs live at https://3dodev.com/ — link to
-specific page(s) in the per-port renderer comment headers.
+**Status: blocked upstream on trapexit/3do-devkit.** Investigation in
+v0.3 established the precise nature of the block:
+
+### What we proved works
+- Pads work via `InitEventUtility(N, M, LC_NoSeeUm|LC_Observer)` +
+  `GetControlPad(N)` polling. This path uses a built-in kernel pad
+  driverlet and bypasses the event broker entirely. Confirmed on
+  real hardware (Panasonic FZ-1 ODE).
+
+### What we proved is blocked
+- `EB_Configure` listener subscription with the right trigger mask
+  (every state-change bit + every `*DataArrived` heartbeat bit for
+  Mouse / Stick / LightGun): accepted (`ACK Y`), but never delivers
+  any EventRecord on real hardware (`EVT 0` with a flightstick
+  physically connected and being actively manipulated).
+- `EB_DescribePods` query: replies cleanly with `pod_count = 0`
+  even with a flightstick + pad chain physically connected.
+- `LoadProgram("System/Drivers/cport1.rom")` (and `41/49/4d.rom`,
+  with leading-slash / no-slash / `$boot/`-prefix variants): fails
+  on every path. Byte inspection confirms why: the files are
+  PodROM format, a 32-byte custom header (DEADBEEF-prefixed
+  checksum + total-byte-count + family code) followed by a
+  standard AIF. `LoadProgram` expects bare AIF and bails on the
+  unrecognised prefix.
+- `LoadProgram("System/Tasks/eventbroker")`: succeeds in Opera
+  (where no daemon is running, so this starts one), fails on real
+  hardware (where the daemon was already started during the BIOS
+  `startopera` sequence and a second instance is refused). Either
+  outcome leaves `POD = 0` and `EVT = 0`.
+
+### Why this is "internal API only"
+- Exhaustive search of `/opt/3do-devkit/include/3do/` and
+  `/include/3dosdk/{1p2,1p3,2p5}/` finds zero public functions
+  that load a PodROM file. The only mentions of "LoadDriver" are
+  enum values (e.g. `POD_LoadDriver = 2` in `PodLoginLogoutPhase`)
+  describing daemon-internal phases.
+- `EB_Command = 7` is the most likely channel for "load driverlet
+  from path X" -- but `event.h` literally says: *"For internal
+  use, not specified here."*
+- Inspection of strings in the compiled `System/Tasks/eventbroker`
+  daemon binary shows only the program name; paths and opcode
+  literals are computed at runtime or stored in non-string form.
+
+### Confirmed by trapexit
+- 2026-05-12 (initial): non-pad PBUS classes need a custom kernel-
+  level pod driver.
+- 2026-05-12 (followup): the SDK side IS fully supported and
+  shipped with retail games -- it's just that no example shows
+  how, and the devkit doesn't yet bundle one. He's adding it.
+- The drivers Portfolio already ships as PodROM files cover:
+  Pad (built into kernel), Mouse (`cport49.rom`), Lightgun
+  (`cport4d.rom`), Stereoscopic Glasses (likely `cport41.rom`),
+  Analog Stick / Flightstick (likely `cport1.rom`). Only the
+  Silly Control Pad (0xC0 Arcade) needs a fresh driver written.
+
+### When the upstream example lands
+1. Use whatever loader API trapexit exposes (likely a wrapper
+   around the private `EB_Command` opcode, or a new SDK helper).
+2. Call it for each driverlet in our app before `broker_connect()`.
+3. Our existing `apply_event_record()` already dispatches by
+   `ef_EventNumber` and updates per-pod state -- should "just
+   work" once events flow.
+4. Re-enable `ENABLE_DIAG_STATUS` in `src/main.cpp` for the
+   verification pass; flip back to 0 once stable.
 
 ### 3. Logo header on main screen
 

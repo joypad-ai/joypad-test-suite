@@ -67,7 +67,7 @@
 #define SCREEN_W       320
 #define SCREEN_H       240
 #define CYCLE_COUNT    7
-#define LOGO_W         66
+#define LOGO_W         76
 #define LOGO_H         64
 
 // Toggle for the broker-pipeline diagnostic status line. Pads work
@@ -213,9 +213,9 @@ static uint32    g_dbg_pod_flavor   = 0;   // ebh_Flavor of last reply payload
 // Shared across all keyboard pods on the chain (a single typing
 // stream, even if two keyboards were attached). Width is bounded by
 // what fits to the right of the prompt on a 320-pixel screen --
-// 8 px / char, "> " is 16 px starting at x=20, leaves 320-36 = 284 px
-// = 35 char cells.
-#define KB_TEXT_MAX        35
+// 8 px / char, "> " is 16 px starting at x=40 (Type column), so text
+// starts at x=56 and we have 320-56 = 264 px = 33 char cells.
+#define KB_TEXT_MAX        33
 static char      g_kb_text[KB_TEXT_MAX + 1] = { 0 };
 static int       g_kb_textlen = 0;
 static uint32    g_kb_prev_matrix[8] = { 0 };
@@ -929,14 +929,17 @@ draw_keyboard_row (BasicDisplay &display, device_t *dev, int y)
         }
     }
 
-  // "Nkk: HH HH HH HH"  (count and up to 4 scancodes in hex).
-  display.draw_text8 (108, y, "K:");
+  // "K:NN HH HH HH HH"  (count and up to 4 scancodes in hex).
+  // Starts at x=128 to clear the ID column (which ends at x=112 --
+  // 96 px label start + 16 px for two hex chars), leaving a 16 px
+  // breathing-room gap.
+  display.draw_text8 (128, y, "K:");
   buf[0] = '0' + ((total / 10) % 10);
   buf[1] = '0' + (total % 10);
   buf[2] = 0;
-  display.draw_text8 (124, y, buf);
+  display.draw_text8 (144, y, buf);
 
-  int x = 148;
+  int x = 168;
   for (int i = 0; i < 4; i++)
     {
       if (i < nscs)
@@ -954,16 +957,16 @@ draw_keyboard_row (BasicDisplay &display, device_t *dev, int y)
       x += 24;
     }
 
-  /* Row 2: terminal-style typed-input line. Starts with "> " prompt,
-   * shows the typed buffer, and a blinking cursor (underscore) at
-   * the insertion point. Blink rate ~1 Hz (toggle every 30 frames at
-   * 60 fps). */
+  /* Row 2: terminal-style typed-input line. Starts at x=40 to align
+   * with the Type column. "> " prompt, then the typed buffer, then a
+   * blinking cursor (underscore) at the insertion point. Blink rate
+   * ~1 Hz (toggle every 30 frames at 60 fps). */
   int y2 = y + 14;
-  display.draw_text8 (20, y2, "> ");
+  display.draw_text8 (40, y2, "> ");
   if (g_kb_textlen > 0)
-    display.draw_text8 (36, y2, g_kb_text);
+    display.draw_text8 (56, y2, g_kb_text);
   if (((g_kb_blink_frame / 30) & 1) == 0)
-    display.draw_text8 (36 + g_kb_textlen * 8, y2, "_");
+    display.draw_text8 (56 + g_kb_textlen * 8, y2, "_");
 }
 
 // SillyPad / Arcade buttons. Our SillyPadDriver decodes byte 1 of

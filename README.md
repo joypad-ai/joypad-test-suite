@@ -31,9 +31,10 @@ A collection of homebrew controller test ROMs across game consoles. Each console
 | GameCube | working | [`gcn/`](gcn/) | [zlib](gcn/LICENSE.md) |
 | Game Boy Advance | working | [`gba/`](gba/) | [MIT](gba/LICENSE.md) |
 | PC Engine | working | [`pce/`](pce/) | [MIT](pce/LICENSE.md) |
-| 3DO | scaffolded | [`3do/`](3do/) | [MIT](3do/LICENSE.md) |
+| 3DO | working | [`3do/`](3do/) | [MIT](3do/LICENSE.md) |
+| Dreamcast | scaffolded | [`dc/`](dc/) | [MIT](dc/LICENSE.md) |
 
-Subdirs use short 3-letter codenames (`gcn`, `gba`, `pce`, future
+Subdirs use short 3-letter codenames (`gcn`, `gba`, `pce`, `dc`, future
 `n64`/`snes`/…) matching homebrew-community conventions. Release tags
 follow the same prefix: `<codename>-v<semver>`.
 
@@ -46,7 +47,8 @@ Each console app has its own lineage. As more consoles join, this list grows.
 | GameCube | Derived from [corenting/GC-Controller-Test](https://github.com/corenting/GC-Controller-Test) (zlib). Multi-port layout and accessory probe flow modeled after [meeq/JoypadTest-N64](https://github.com/meeq/JoypadTest-N64). GC keyboard wire format and scancode table come from the [joypad-os](https://github.com/joypad-ai/joypad-os) firmware (`src/lib/joybus-pio`). |
 | Game Boy Advance | Joybus handshake + main loop from [Doridian/Joybus-PIO](https://github.com/Doridian/Joybus-PIO) (MIT). Eyes overlay ported from [joypad-os](https://github.com/joypad-ai/joypad-os)'s `eyes_anim`. Mode-4 page-flipped screensaver matches the GameCube tester's logo + color cycle. Two ROM variants from one source tree: `joypad_mb.gba` (eyes, for joypad-os submodule consumers) and `tester_mb.gba` (Doridian + on-GBA console). |
 | PC Engine | Baseline from [dshadoff/PCE_Mouse_Test](https://github.com/dshadoff/PCE_Mouse_Test) (MIT). Detects 2-button / 6-button pads and the PC Engine mouse, including multitap support. Built with [uli/huc](https://github.com/uli/huc) (HuC) pinned in a Docker image we maintain. |
-| 3DO | Fresh implementation against [trapexit/3do-devkit](https://github.com/trapexit/3do-devkit) (ISC). Reads the daisy-chain control pad via the 3DO Portfolio SDK's `DoControlPad` API. Reference: Charles Doty (RasterSoft)'s [3DO Controller Test Multi](https://3dodev.com/software/homebrew/console_tools) (2016, permissively-licensed). Pinned devkit commit lives in `3do/buildtools/Dockerfile`. |
+| 3DO | Fresh implementation against [trapexit/3do-devkit](https://github.com/trapexit/3do-devkit) (ISC). Detects every PBUS device on the daisy chain (Pad, Mouse, Stick, LightGun, Arcade SillyPad, Keyboard) by talking directly to the Portfolio event broker. Bundles a rebuilt broker daemon from [trapexit/portfolio_os](https://github.com/trapexit/portfolio_os) with every driverlet static-linked in, plus a new `SillyPadDriver.c` for the 0xC0 silly-pad and a finished `KeyboardDriver.c` (PR open upstream). Conceptual ancestor: Charles Doty (RasterSoft)'s [3DO Controller Test Multi](https://3dodev.com/software/homebrew/console_tools) (2016). Pinned devkit commit lives in `3do/buildtools/Dockerfile`. |
+| Dreamcast | Fresh implementation against [KallistiOS](https://github.com/KallistiOS/KallistiOS) (BSD-style). Reads every maple-bus device class — controllers, mice, keyboards, light guns, plus per-port slot peripherals (VMU, Purupuru, microphone). Also hosts a built-in VMU icon editor mode (v0.2+) ported from [RobertDaleSmith/vmu-icon-maker](https://github.com/RobertDaleSmith/vmu-icon-maker) (MIT). First console in the repo to ship the mode-switching scaffold (Options menu via Start+Down) that future testers can adopt. Pinned KOS commit lives in `dc/buildtools/Dockerfile`. |
 
 Originating copyrights are preserved in each console's source headers.
 

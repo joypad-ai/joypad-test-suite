@@ -27,6 +27,7 @@ typedef enum {
     JT_TOOL_ERASE,        /* single-pixel clear (color 0 / mono off) */
     JT_TOOL_FILL,         /* flood fill */
     JT_TOOL_PICK,         /* sample pixel value into current color */
+    JT_TOOL_SWAP,         /* global replace: all pixels of source color -> current */
     JT_TOOL_COUNT
 } jt_tool_t;
 
@@ -87,6 +88,11 @@ void jt_canvas_erase_pixel(jt_canvas_t *c, int x, int y);
 /* Bucket fill — same-value flood from (x, y) until value boundary
  * (or canvas edge). Pushes a single undo snapshot at entry. */
 void jt_canvas_fill(jt_canvas_t *c, int x, int y);
+
+/* Color swap: replace every pixel whose color index matches the
+ * pixel at (x, y) with current_color globally. Color layer only.
+ * Pushes one undo snapshot. */
+void jt_canvas_swap_color(jt_canvas_t *c, int x, int y);
 
 /* Sample whatever the pixel at (x, y) is into current_color. No
  * mutation, no undo. */

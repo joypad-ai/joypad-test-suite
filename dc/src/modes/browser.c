@@ -30,12 +30,18 @@
 #define MAX_ENTRIES 64
 #define THUMB_PX    32
 
+#define MAX_FRAMES 3
+
 typedef struct {
     int      port;
     int      slot;
     char     filename[13];   /* 12 + NUL */
     int      blocks;         /* file size in VMU blocks */
-    jt_icon_t icon;          /* decoded frame 0 + palette */
+    /* Up to 3 decoded frames + animation speed for cycling preview.
+     * frame_count = 0 means we failed to decode at all. */
+    jt_icon_t frames[MAX_FRAMES];
+    int      frame_count;
+    uint16_t anim_speed;     /* VMS header anim speed field */
     bool     icon_valid;
 } browser_entry_t;
 
@@ -44,6 +50,11 @@ static int entry_count = 0;
 static int selected = 0;
 static int scroll_top = 0;
 static bool needs_refresh = true;
+
+/* Animation time accumulator. Header anim_speed is roughly "ticks
+ * between frames"; treating it as ~60Hz ticks gives reasonable
+ * cadence for the typical Sega-shipped values. */
+static float anim_time_s = 0.0f;
 
 /* Last button state for edge detection. */
 static uint32_t last_btns = 0;
@@ -106,6 +117,8 @@ static void refresh_entries(void)
                 e->filename[12] = '\0';
                 e->blocks = dirents[i].filesize;
                 e->icon_valid = false;
+                e->frame_count = 0;
+                e->anim_speed = 0;
 
                 /* Decode a thumbnail by reading just enough for the
                  * header + 1 icon frame (0x80 + 512 = 0x280 = 640
@@ -115,12 +128,32 @@ static void refresh_entries(void)
                 void *raw = NULL;
                 int   sz = 0;
                 if (vmufs_read_dirent(dev, &dirents[i], &raw, &sz) == 0 && raw) {
+                    const uint8_t *bytes = (const uint8_t *)raw;
                     /* ICONDATA_VMS lives outside the regular game-save
                      * format -- decode via the icondata path. */
                     if (memcmp(e->filename, "ICONDATA_VMS", 12) == 0) {
-                        e->icon_valid = jt_vms_decode_icondata(raw, sz, &e->icon);
+                        if (jt_vms_decode_icondata(bytes, sz, &e->frames[0])) {
+                            e->icon_valid = true;
+                            e->frame_count = 1;
+                        }
                     } else {
-                        e->icon_valid = jt_vms_extract_save_icon(raw, sz, 0, &e->icon);
+                        unsigned n = jt_vms_save_icon_count(bytes, sz);
+                        if (n > MAX_FRAMES) n = MAX_FRAMES;
+                        for (unsigned f = 0; f < n; f++) {
+                            if (jt_vms_extract_save_icon(bytes, sz, f, &e->frames[f])) {
+                                e->frame_count++;
+                            }
+                        }
+                        if (e->frame_count > 0) e->icon_valid = true;
+                        /* Animation speed at header offset 0x42 (LE u16).
+                         * Spec-wise this is the delay between frames; many
+                         * games use ~10 (= ~0.5s) — we'll interpret it as
+                         * an arbitrary tick count and scale to frames per
+                         * second. */
+                        if (sz >= 0x44) {
+                            e->anim_speed = (uint16_t)(bytes[0x42] |
+                                                       (bytes[0x43] << 8));
+                        }
                     }
                     free(raw);
                 }
@@ -147,8 +180,9 @@ static void perform_apply(int target_port, int target_slot)
     if (entry_count == 0 || selected < 0 || selected >= entry_count) return;
     browser_entry_t *e = &entries[selected];
     if (!e->icon_valid) return;
-    /* Best-effort apply; result printed in the status line. */
-    (void)jt_apply_icondata(&e->icon, target_port, target_slot);
+    /* Apply frame 0 — multi-frame ICONDATA_VMS isn't a thing the BIOS
+     * supports anyway; only game saves animate. */
+    (void)jt_apply_icondata(&e->frames[0], target_port, target_slot);
 }
 
 static void perform_extract_to_editor(void)
@@ -156,13 +190,13 @@ static void perform_extract_to_editor(void)
     if (entry_count == 0 || selected < 0 || selected >= entry_count) return;
     browser_entry_t *e = &entries[selected];
     if (!e->icon_valid) return;
-    jt_browser_push_to_editor(&e->icon);
+    jt_browser_push_to_editor(&e->frames[0]);
     jt_request_mode(JT_MODE_VMU_EDITOR);
 }
 
 static void browser_update(float dt)
 {
-    (void)dt;
+    anim_time_s += dt;
     if (needs_refresh) refresh_entries();
 
     uint32_t btns = aggregate_pad_buttons();
@@ -241,18 +275,30 @@ static void browser_draw(void)
         uint16_t fg = (idx == selected) ? JT_COL_YELLOW : JT_COL_WHITE;
         const char *marker = (idx == selected) ? ">" : " ";
 
-        /* Thumbnail. */
-        if (e->icon_valid) draw_thumb(8, y - 2, &e->icon, 24);
+        /* Thumbnail. Multi-frame saves cycle through frames at the
+         * declared anim_speed; treat anim_speed as ticks at ~60Hz and
+         * clamp to a reasonable per-frame delay floor so 0 doesn't
+         * crash (some saves declare 0 -> use 0.5s default). */
+        int frame = 0;
+        if (e->icon_valid && e->frame_count > 1) {
+            float per_frame = (e->anim_speed > 0) ?
+                              (float)e->anim_speed / 60.0f : 0.5f;
+            if (per_frame < 0.05f) per_frame = 0.05f;
+            int total = (int)(anim_time_s / per_frame);
+            frame = total % e->frame_count;
+        }
+        if (e->icon_valid) draw_thumb(8, y - 2, &e->frames[frame], 24);
         else {
             /* placeholder box */
             for (int yy = 0; yy < 24; yy++)
                 for (int xx = 0; xx < 24; xx++)
                     vram_s[(y - 2 + yy) * 640 + (8 + xx)] = JT_COL_GREY;
         }
+        const char *anim_mark = (e->frame_count > 1) ? "~" : " ";
         jt_text(40, y, fg, JT_COL_BLACK,
-                "%s %c%d %-12s %3d blk",
+                "%s %c%d %s%-12s %3d blk",
                 marker, 'A' + e->port, e->slot + 1,
-                e->filename, e->blocks);
+                anim_mark, e->filename, e->blocks);
     }
 
     /* Footer instructions. */

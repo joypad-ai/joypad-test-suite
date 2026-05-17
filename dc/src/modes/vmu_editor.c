@@ -79,6 +79,13 @@ static int  pending_save_port = -1;
 static int  pending_save_slot = -1;
 static bool save_awaiting_name = false;
 
+/* Palette editor overlay state. Active when palette_edit_idx >= 0;
+ * channel 0..3 = R, G, B, A (each 4 bits = 0..15). */
+static int palette_edit_idx = -1;
+static int palette_edit_channel = 0;
+static uint8_t palette_edit_rgba[4];   /* current R, G, B, A */
+static uint16_t palette_edit_snapshot;  /* original packed value for cancel */
+
 static void rebuild_apply_targets(void)
 {
     apply_target_count = 0;
@@ -92,6 +99,59 @@ static void rebuild_apply_targets(void)
         }
     }
     if (picker_idx >= apply_target_count) picker_idx = 0;
+}
+
+/* Open the palette editor on a specific palette index. */
+static void open_palette_editor(int idx)
+{
+    if (idx < 0 || idx >= JT_PALETTE_ENTRIES) return;
+    palette_edit_idx = idx;
+    palette_edit_channel = 0;
+    palette_edit_snapshot = canvas.palette[idx];
+    /* Unpack to 4-bit-per-channel form so the editor works in the
+     * native on-disc resolution (no conversion-back rounding). */
+    uint8_t r, g, b, a;
+    jt_palette_unpack(canvas.palette[idx], &r, &g, &b, &a);
+    palette_edit_rgba[0] = (uint8_t)(r / 17);   /* 0..15 */
+    palette_edit_rgba[1] = (uint8_t)(g / 17);
+    palette_edit_rgba[2] = (uint8_t)(b / 17);
+    palette_edit_rgba[3] = (uint8_t)(a / 17);
+}
+
+static void palette_editor_apply_live(void)
+{
+    uint8_t r4 = palette_edit_rgba[0] & 0x0F;
+    uint8_t g4 = palette_edit_rgba[1] & 0x0F;
+    uint8_t b4 = palette_edit_rgba[2] & 0x0F;
+    uint8_t a4 = palette_edit_rgba[3] & 0x0F;
+    canvas.palette[palette_edit_idx] = jt_palette_pack(r4 * 17, g4 * 17,
+                                                       b4 * 17, a4 * 17);
+}
+
+static void palette_editor_commit(void)
+{
+    /* Re-snapshot for undo (we replaced palette_edit_snapshot up
+     * front so the live preview never pushes spurious undo entries). */
+    jt_canvas_push_undo(&canvas);
+    /* The undo snapshot just took the LIVE state. Need the pre-edit
+     * value in the snapshot for proper rollback. Stash the live, set
+     * the snapshot, push, restore live. */
+    uint16_t live = canvas.palette[palette_edit_idx];
+    canvas.palette[palette_edit_idx] = palette_edit_snapshot;
+    /* The push_undo above already snapshotted the LIVE state; we
+     * actually want the snapshot to contain pre-edit. Easiest: pop
+     * the just-pushed snapshot, re-push with the pre-edit value. */
+    canvas.undo_count--;     /* undo the push */
+    canvas.undo_head = (canvas.undo_head - 1 + JT_UNDO_DEPTH) % JT_UNDO_DEPTH;
+    jt_canvas_push_undo(&canvas);
+    canvas.palette[palette_edit_idx] = live;
+    palette_edit_idx = -1;
+}
+
+static void palette_editor_cancel(void)
+{
+    canvas.palette[palette_edit_idx] = palette_edit_snapshot;
+    palette_edit_idx = -1;
 }
 
 /* Write canvas to the library save on a VMU. */
@@ -272,6 +332,28 @@ static void editor_update(float dt)
     uint32_t btns = aggregate_pad_buttons();
     uint32_t edges = btns & ~last_btns;
 
+    /* Palette editor overlay takes precedence over everything else. */
+    if (palette_edit_idx >= 0) {
+        if (edges & CONT_DPAD_UP)    if (palette_edit_channel > 0) palette_edit_channel--;
+        if (edges & CONT_DPAD_DOWN)  if (palette_edit_channel < 3) palette_edit_channel++;
+        if (edges & CONT_DPAD_LEFT) {
+            if (palette_edit_rgba[palette_edit_channel] > 0) {
+                palette_edit_rgba[palette_edit_channel]--;
+                palette_editor_apply_live();
+            }
+        }
+        if (edges & CONT_DPAD_RIGHT) {
+            if (palette_edit_rgba[palette_edit_channel] < 15) {
+                palette_edit_rgba[palette_edit_channel]++;
+                palette_editor_apply_live();
+            }
+        }
+        if (edges & CONT_A) palette_editor_commit();
+        if (edges & CONT_B) palette_editor_cancel();
+        last_btns = btns;
+        return;
+    }
+
     if (picker_purpose != PICK_NONE) {
         if (edges & CONT_DPAD_UP)   if (picker_idx > 0) picker_idx--;
         if (edges & CONT_DPAD_DOWN) if (picker_idx < apply_target_count - 1) picker_idx++;
@@ -330,6 +412,8 @@ static void editor_update(float dt)
                 jt_canvas_fill(&canvas, cx, cy);
             } else if (canvas.tool == JT_TOOL_PICK && a_edge) {
                 jt_canvas_pick(&canvas, cx, cy);
+            } else if (canvas.tool == JT_TOOL_SWAP && a_edge) {
+                jt_canvas_swap_color(&canvas, cx, cy);
             } else {
                 jt_canvas_set_pixel(&canvas, cx, cy);
             }
@@ -350,8 +434,12 @@ static void editor_update(float dt)
             jt_canvas_mono_set(&canvas, cx, cy, false);
             jt_canvas_mono_sync_palette(&canvas);
         }
-    } else if (r == R_COLOR_SWATCH && a_edge) {
-        canvas.current_color = (uint8_t)(arg & 0x0F);
+    } else if (r == R_COLOR_SWATCH) {
+        /* A = set current color. X (or X+A) = open palette editor on
+         * this swatch. The X edge is the trigger -- press X over a
+         * swatch to recolor it. */
+        if (a_edge) canvas.current_color = (uint8_t)(arg & 0x0F);
+        if (edges & CONT_X) open_palette_editor(arg);
     } else if (r == R_MONO_TOGGLE && a_edge) {
         jt_canvas_mono_toggle_palette(&canvas, arg);
     } else if (a_edge) {
@@ -495,6 +583,7 @@ static const char *tool_name(jt_tool_t t)
         case JT_TOOL_ERASE: return "Erase";
         case JT_TOOL_FILL:  return "Fill";
         case JT_TOOL_PICK:  return "Pick";
+        case JT_TOOL_SWAP:  return "Swap";
         default:            return "?";
     }
 }
@@ -544,6 +633,57 @@ static void draw_cursor_crosshair(void)
     fill_rect(sx + ZOOM, sy - 1, 1, ZOOM + 2, JT_COL_YELLOW);
 }
 
+static void draw_palette_editor(void)
+{
+    if (palette_edit_idx < 0) return;
+    /* Modal centered at (140, 120, 360, 220). */
+    const int x = 140, y = 120, w = 360, h = 220;
+    fill_rect(x, y, w, h, JT_COL_BLACK);
+    fill_rect(x, y, w, 2, JT_COL_YELLOW);
+    fill_rect(x, y + h - 2, w, 2, JT_COL_YELLOW);
+    fill_rect(x, y, 2, h, JT_COL_YELLOW);
+    fill_rect(x + w - 2, y, 2, h, JT_COL_YELLOW);
+
+    jt_text(x + 12, y + 8, JT_COL_YELLOW, JT_COL_BLACK,
+            "EDIT PALETTE COLOR %02d", palette_edit_idx);
+
+    /* Live preview swatch. Alpha is stored but the framebuffer is
+     * opaque-only, so we just visualize R/G/B. */
+    uint8_t r4 = palette_edit_rgba[0] & 0x0F;
+    uint8_t g4 = palette_edit_rgba[1] & 0x0F;
+    uint8_t b4 = palette_edit_rgba[2] & 0x0F;
+    uint16_t live_rgb565 = (uint16_t)(((r4 * 17 >> 3) << 11) |
+                                       ((g4 * 17 >> 2) << 5) |
+                                       (b4 * 17 >> 3));
+    fill_rect(x + 12, y + 36, 48, 48, live_rgb565);
+    fill_rect(x + 11, y + 35, 50, 1, JT_COL_WHITE);
+    fill_rect(x + 11, y + 84, 50, 1, JT_COL_WHITE);
+    fill_rect(x + 11, y + 35, 1, 50, JT_COL_WHITE);
+    fill_rect(x + 60, y + 35, 1, 50, JT_COL_WHITE);
+
+    /* Channel sliders. */
+    const char *labels[4] = { "R", "G", "B", "A" };
+    for (int c = 0; c < 4; c++) {
+        int ly = y + 40 + c * 32;
+        uint16_t lc = (c == palette_edit_channel) ? JT_COL_YELLOW : JT_COL_WHITE;
+        jt_text(x + 80, ly, lc, JT_COL_BLACK, "%s", labels[c]);
+        /* 16-step bar: 15 cells of 16px each. */
+        for (int v = 0; v < 16; v++) {
+            int cx = x + 100 + v * 14;
+            int cy = ly + 4;
+            uint16_t bg = (v == palette_edit_rgba[c]) ? lc :
+                          (v < palette_edit_rgba[c]) ? JT_RGB565(80, 80, 80) :
+                                                       JT_RGB565(30, 30, 30);
+            fill_rect(cx, cy, 12, 14, bg);
+        }
+        jt_text(x + 100 + 16 * 14 + 8, ly, JT_COL_GREY, JT_COL_BLACK,
+                "%2d", palette_edit_rgba[c]);
+    }
+
+    jt_text(x + 12, y + h - 28, JT_COL_GREY, JT_COL_BLACK,
+            "Up/Dn channel  Left/Right value  A: save  B: cancel");
+}
+
 static void draw_picker(void)
 {
     if (picker_purpose == PICK_NONE) return;
@@ -591,6 +731,7 @@ static void editor_draw(void)
     draw_status();
     draw_cursor_crosshair();
     draw_picker();
+    draw_palette_editor();
 
     if (apply_result_frames > 0) {
         jt_text_centered(BUTTON_Y + 60, JT_COL_GREEN, JT_COL_BLACK,
@@ -598,7 +739,7 @@ static void editor_draw(void)
     }
 
     jt_text_centered(444, JT_COL_GREY, JT_COL_BLACK,
-                     "Cursor: A paint  B erase  X pick  Y tool  D-pad: color+/realmode");
+                     "A paint  B erase  X pick (or X-on-swatch=edit color)  Y tool");
     jt_text_centered(468, JT_COL_GREEN, JT_COL_BLACK,
                      "Hold Start+Down for options menu");
 }

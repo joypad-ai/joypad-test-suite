@@ -1,5 +1,37 @@
 # Joypad Tester — Dreamcast — Changelog
 
+## v0.2.2 — 2026-05-17
+
+Polish + parity round. Closes the remaining web-app feature gaps
+that v0.2.1 acknowledged: palette editing, color swap, and animated
+multi-frame icon preview.
+
+### Highlights
+
+- **Palette color editor** — press **X** while the cursor is over
+  any color swatch in the editor's palette strip to open a 4-channel
+  ARGB editor overlay. D-pad up/down picks the channel (R/G/B/A),
+  left/right adjusts the value (0..15, matching the 4-bit on-disc
+  precision). Live preview swatch updates as you scroll. A
+  commits + pushes an undo snapshot; B reverts.
+- **Color swap tool** — new tool (Y cycles `Paint → Erase → Fill →
+  Pick → Swap`). A on a pixel in the color canvas replaces every
+  pixel of that source color with the current color globally —
+  one-click recolor.
+- **Animated multi-frame icon preview** — Save Browser now decodes
+  all 1..3 frames from each save (was just frame 0) and cycles the
+  thumbnail at the declared `anim_speed` (header offset 0x42).
+  Rows with multi-frame icons get a `~` indicator after the
+  port/slot prefix.
+
+### Deferred to v0.3
+
+- Image import (PNG/BMP → 32×32 quantized to the active palette).
+  Requires a kos-ports libpng dependency; weighing whether to vendor
+  a smaller PNG decoder instead.
+- Eyecatch (cover-art) decode/display for game saves.
+- DreamPi network upload/download against the existing PHP backend.
+
 ## v0.2.1 — 2026-05-17
 
 Editor reworked to match the web `dreamcast-icon-maker`'s two-pane

@@ -262,6 +262,18 @@ void jt_canvas_mono_reset(jt_canvas_t *c)
     memset(c->mono_palette_states, 0, sizeof(c->mono_palette_states));
 }
 
+void jt_canvas_swap_color(jt_canvas_t *c, int x, int y)
+{
+    if (!in_bounds(x, y) || c->layer != JT_LAYER_COLOR) return;
+    jt_canvas_push_undo(c);
+    uint8_t src = c->color_indices[idx_for(x, y)] & 0x0F;
+    uint8_t dst = c->current_color & 0x0F;
+    if (src == dst) return;
+    for (int i = 0; i < JT_CANVAS_W * JT_CANVAS_H; i++) {
+        if ((c->color_indices[i] & 0x0F) == src) c->color_indices[i] = dst;
+    }
+}
+
 uint16_t jt_canvas_pixel_argb1555(const jt_canvas_t *c, int x, int y)
 {
     if (!in_bounds(x, y)) return 0;

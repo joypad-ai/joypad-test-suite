@@ -92,6 +92,7 @@ STUBS_EOF
                       AddStaticDriver(0x4B, (Err (*)())_Keyboard_DriverletEntry);
                       AddStaticDriver(0x4D, (Err (*)())_Lightgun_DriverletEntry);
                       AddStaticDriver(0xC0, (Err (*)())_Sillypad_DriverletEntry);
+                      AddStaticDriver(0x0F, (Err (*)())_Wheel_DriverletEntry);
 };
                   }
                   if (/^extern Err ControlPadDriver/) {
@@ -101,6 +102,7 @@ extern Err _Glasses_DriverletEntry(PodInterface *);
 extern Err _Mouse_DriverletEntry(PodInterface *);
 extern Err _Lightgun_DriverletEntry(PodInterface *);
 extern Err _Sillypad_DriverletEntry(PodInterface *);
+extern Err _Wheel_DriverletEntry(PodInterface *);
 };
                   }
                 ' EventBroker.c
@@ -112,6 +114,7 @@ extern Err _Sillypad_DriverletEntry(PodInterface *);
                 # KeyboardDriver uses 'Err KeyboardDriver(PodInterface *)' (static-pattern, not DriverletEntry).
                 armcc -DCONTROLPORT -DARMC -DKeyboardDriver=_Keyboard_DriverletEntry -O \$CFLAGS \$INCS -c \$PO/src/input/KeyboardDriver.c -o KeyboardDriver.do
                 armcc -DCONTROLPORT -DARMC -DDriverletEntry=_Sillypad_DriverletEntry -O \$CFLAGS \$INCS -c /work/buildtools/SillyPadDriver.c -o SillyPadDriver.do
+                armcc -DCONTROLPORT -DARMC -DDriverletEntry=_Wheel_DriverletEntry    -O \$CFLAGS \$INCS -c /work/buildtools/WheelDriver.c    -o WheelDriver.do
 
                 armcc -DCONTROLPORT -DARMC -O \$CFLAGS \$INCS -c EventBroker.c -o EventBroker.do
                 for f in ControlPadDriver DefaultDriver SplitterDriver DummyPutc autodocs; do
@@ -131,7 +134,7 @@ extern Err _Sillypad_DriverletEntry(PodInterface *);
                   \$LIBPATH/lib3do.lib \$LIBPATH/operamath.lib \$LIBPATH/string.lib \\
                   \$LIBPATH/swi.lib \\
                   EventBroker.do ControlPadDriver.do DefaultDriver.do SplitterDriver.do \\
-                  StickDriver.do MouseDriver.do LightGunRom.do GlassesDriver.do KeyboardDriver.do SillyPadDriver.do \\
+                  StickDriver.do MouseDriver.do LightGunRom.do GlassesDriver.do KeyboardDriver.do SillyPadDriver.do WheelDriver.do \\
                   DummyPutc.do autodocs.do RegisterGlue.do
 
                 # Match the original portfolio_os build settings

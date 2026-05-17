@@ -92,6 +92,7 @@ typedef enum {
   DEV_GLASSES,
   DEV_IR,
   DEV_SPLITTER,
+  DEV_WHEEL,        /* steering wheel (PBUS class 0x0F, BitTable[15]) */
   DEV_UNKNOWN,
 } dev_type_t;
 
@@ -314,6 +315,7 @@ type_label (dev_type_t t)
     case DEV_GLASSES:  return "Glas";
     case DEV_IR:       return "IR";
     case DEV_SPLITTER: return "Splt";
+    case DEV_WHEEL:    return "Wheel";
     default:           return "????";
     }
 }
@@ -337,6 +339,7 @@ pbus_id_byte_for (dev_type_t t)
     case DEV_LIGHTGUN: return 0x4D;
     case DEV_ARCADE:   return 0xC0;
     case DEV_STICK:    return 0x01;
+    case DEV_WHEEL:    return 0x0F;
     default:           return 0x00;
     }
 }
@@ -384,6 +387,9 @@ type_from_pod_descr (uint32 pod_flags, uint32 pod_type)
     case 0x56: return DEV_SPLITTER;  // control-port splitter (arm 1)
     case 0x57: return DEV_SPLITTER;  // control-port splitter (arm 2)
     case 0xC0: return DEV_ARCADE;    // SillyPad / Orbatak arcade
+    case 0x0F: return DEV_WHEEL;     // steering wheel (BitTable[15],
+                                     // Home Arcade Systems wheel for
+                                     // Need for Speed). PBUS byte guess.
     }
   // Pad bytes always have bits 4-3 != 00 (d-pad up/down can't be
   // 'both pressed'). If we see that pattern in pod_Type, classify
@@ -905,6 +911,54 @@ draw_stick_row (BasicDisplay &display, device_t *dev, int y)
   display.draw_text8 (248, y2, buf);
 }
 
+// Steering wheel row. The WheelDriver reuses StickEventData, packing:
+//   stk_HorizPosition = raw byte (suspected steering, signed)
+//   stk_VertPosition  = raw byte (suspected throttle 0..255)
+//   stk_DepthPosition = raw byte (suspected brake 0..255)
+//   stk_ButtonBits    = top byte (suspected button bits)
+// Until someone confirms the protocol with real hardware, the labels
+// show the raw byte values rather than processed wheel units.
+static void
+draw_wheel_row (BasicDisplay &display, device_t *dev, int y)
+{
+  char buf[8];
+  StickEventData *s = &dev->stick;
+  uint32 buttons = s->stk_ButtonBits;
+  int i;
+  static const struct { uint32 mask; const char *l; int x; } WBTNS[] = {
+    { 0x80000000u, "1", 140 },  /* byte4 bit7 .. bit0 -- meaning TBD */
+    { 0x40000000u, "2", 152 },
+    { 0x20000000u, "3", 164 },
+    { 0x10000000u, "4", 176 },
+    { 0x08000000u, "5", 188 },
+    { 0x04000000u, "6", 200 },
+    { 0x02000000u, "7", 212 },
+    { 0x01000000u, "8", 224 },
+  };
+
+  draw_row_chrome (display, dev, y);
+
+  for (i = 0; i < (int)(sizeof WBTNS / sizeof WBTNS[0]); i++)
+    display.draw_text8 (WBTNS[i].x, y,
+                        (buttons & WBTNS[i].mask) ? WBTNS[i].l : ".");
+
+  int y2 = y + 14;
+  /* W = wheel position, T = throttle, B = brake. All shown as raw
+   * bytes (signed for W, unsigned for T/B) since the wire layout is
+   * speculative. */
+  display.draw_text8 (140, y2, "W");
+  format_axis (buf, s->stk_HorizPosition);
+  display.draw_text8 (152, y2, buf);
+
+  display.draw_text8 (188, y2, "T");
+  format_axis (buf, s->stk_VertPosition);
+  display.draw_text8 (200, y2, buf);
+
+  display.draw_text8 (236, y2, "B");
+  format_axis (buf, s->stk_DepthPosition);
+  display.draw_text8 (248, y2, buf);
+}
+
 static void
 draw_lightgun_row (BasicDisplay &display, device_t *dev, int y)
 {
@@ -1200,6 +1254,7 @@ draw_devices (BasicDisplay &display)
         case DEV_LIGHTGUN: draw_lightgun_row (display, dev, y); break;
         case DEV_ARCADE:   draw_arcade_row   (display, dev, y); break;
         case DEV_KEYBOARD: draw_keyboard_row (display, dev, y); rh = 28; break;
+        case DEV_WHEEL:    draw_wheel_row    (display, dev, y); rh = 28; break;
         default:           draw_generic_row  (display, dev, y); break;
         }
       y += rh;

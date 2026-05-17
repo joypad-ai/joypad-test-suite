@@ -25,6 +25,7 @@ static const char *mode_names[JT_MODE_COUNT] = {
     "Controller Tester",
     "VMU Icon Editor",
     "VMU Save Browser",
+    "Library Browser",
     "About"
 };
 

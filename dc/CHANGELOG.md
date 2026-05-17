@@ -1,5 +1,47 @@
 # Joypad Tester — Dreamcast — Changelog
 
+## v0.2.1 — 2026-05-17
+
+Editor reworked to match the web `dreamcast-icon-maker`'s two-pane
+UX. Adds the on-screen keyboard, save-to-library flow, and the
+library browser that closes the read-back gap from v0.2.0.
+
+### Highlights
+
+- **Two-pane editor** — color and mono canvases visible
+  simultaneously at 6× zoom (192×192 each). Cursor-region-sensitive
+  input: A paints in whichever pane the cursor is over, B erases.
+  Mirrors the web app's side-by-side layout.
+- **Mono palette toggle row** — 16 cells, one per color-palette
+  index. Clicking a cell flips every mono pixel of that color
+  (jt_canvas_mono_toggle_palette). Direct color→silhouette
+  translation, matching the web app's `monoPaletteStates`.
+- **Per-canvas Reset buttons** + **mono Invert button** + **Real
+  Mode toggle button** with on/off indicator.
+- **On-screen keyboard widget** (src/ui/osk.c) — modal 6×10 grid
+  with 3 layers (lower / UPPER / symbols), driven by cursor /
+  D-pad / A, or by a real maple keyboard plugged in (chars flow
+  through the same input path). Triggered by the editor's Name
+  button.
+- **Save-to-library** flow in the editor — picks target VMU,
+  prompts for entry name via OSK, appends to that VMU's
+  `VMUICONS.VMS`.
+- **Library Browser mode** (new) — read-back UI for library saves
+  across all VMUs. A loads selected entry into editor; B prompts
+  to delete; X refreshes. Entries flagged with `*` are auto-
+  backups (stashed by Apply with backup-on-replace); `R` marks
+  Real-Mode-enabled icons.
+- **Save Browser** + **Library Browser** are now distinct modes
+  in the options menu (Controller Tester / VMU Icon Editor / VMU
+  Save Browser / Library Browser / About).
+
+### Deferred to v0.2.2
+
+- Animated-icon preview in the Save Browser (multi-frame cycling).
+- Palette color editing (currently fixed to the 16 default colors;
+  web app lets the user edit each entry).
+- Image import (PNG/BMP → 32×32 quantized to the active palette).
+
 ## v0.2.0 — 2026-05-17
 
 VMU Icon Editor mode is live. Full draw/extract/apply loop wired

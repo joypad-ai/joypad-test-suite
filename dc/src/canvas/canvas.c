@@ -198,6 +198,70 @@ void jt_canvas_fill(jt_canvas_t *c, int x, int y)
     }
 }
 
+void jt_canvas_mono_toggle_palette(jt_canvas_t *c, int idx)
+{
+    if (idx < 0 || idx >= JT_PALETTE_ENTRIES) return;
+    jt_canvas_push_undo(c);
+    c->mono_palette_states[idx] = !c->mono_palette_states[idx];
+    bool on = c->mono_palette_states[idx];
+    /* Cascade: every mono pixel whose color index matches takes the
+     * new state. Matches web app's toggleMonoPaletteIndex(). */
+    for (int p = 0; p < JT_CANVAS_W * JT_CANVAS_H; p++) {
+        if ((c->color_indices[p] & 0x0F) == idx) {
+            int by = p / 8, sh = 7 - (p % 8);
+            if (on) c->mono_bits[by] |=  (uint8_t)(1u << sh);
+            else    c->mono_bits[by] &= (uint8_t)~(1u << sh);
+        }
+    }
+}
+
+void jt_canvas_mono_sync_palette(jt_canvas_t *c)
+{
+    for (int idx = 0; idx < JT_PALETTE_ENTRIES; idx++) {
+        bool has_any = false;
+        bool all_on = true;
+        for (int p = 0; p < JT_CANVAS_W * JT_CANVAS_H; p++) {
+            if ((c->color_indices[p] & 0x0F) != idx) continue;
+            has_any = true;
+            bool on = (c->mono_bits[p / 8] >> (7 - (p % 8))) & 1;
+            if (!on) { all_on = false; break; }
+        }
+        c->mono_palette_states[idx] = has_any && all_on;
+    }
+}
+
+void jt_canvas_mono_invert(jt_canvas_t *c)
+{
+    jt_canvas_push_undo(c);
+    for (size_t i = 0; i < sizeof(c->mono_bits); i++) {
+        c->mono_bits[i] = (uint8_t)~c->mono_bits[i];
+    }
+    jt_canvas_mono_sync_palette(c);
+}
+
+void jt_canvas_color_reset(jt_canvas_t *c)
+{
+    jt_canvas_push_undo(c);
+    for (int i = 0; i < JT_PALETTE_ENTRIES; i++) {
+        c->palette[i] = jt_palette_pack(default_palette[i].r,
+                                        default_palette[i].g,
+                                        default_palette[i].b,
+                                        default_palette[i].a);
+    }
+    memset(c->color_indices, 1, sizeof(c->color_indices)); /* all white */
+    c->current_color = 0;
+    /* Mono cascade: nothing to set true (since palette states are all
+     * tracked but cascading would zero them based on color). Keep
+     * existing mono. */
+}
+
+void jt_canvas_mono_reset(jt_canvas_t *c)
+{
+    jt_canvas_push_undo(c);
+    memset(c->mono_bits, 0, sizeof(c->mono_bits));
+    memset(c->mono_palette_states, 0, sizeof(c->mono_palette_states));
+}
+
 uint16_t jt_canvas_pixel_argb1555(const jt_canvas_t *c, int x, int y)
 {
     if (!in_bounds(x, y)) return 0;

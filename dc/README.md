@@ -101,19 +101,27 @@ dimmed copy of whatever mode is active so the player knows it's a modal,
 not a navigation.
 
 The Controller Tester is the default landing mode (matches every other
-console in this repo). As of v0.2, the menu offers four modes:
+console in this repo). As of v0.2.1, the menu offers five modes:
 
 - **Controller Tester** — the per-port live readout described above.
-- **VMU Icon Editor** — 32×32 color + mono drawable canvas with the
-  unified cursor (analog or DC mouse), 16-color palette strip,
-  paint / erase / fill / pick tools, 32-deep undo. Start opens the
-  target picker; A writes `ICONDATA_VMS` to the selected VMU.
-  Backup-on-replace stashes any existing icon into the per-VMU
-  library save before overwriting.
+- **VMU Icon Editor** — two side-by-side canvases (color + mono,
+  192×192 each at 6× zoom) matching the web `dreamcast-icon-maker`
+  layout. Cursor-region-sensitive: A paints in whichever pane the
+  cursor is over, B erases. **Mono palette toggle row** (one cell
+  per color-palette index) flips every mono pixel of that color
+  for instant color→silhouette translation. Per-canvas Reset
+  buttons, mono Invert button, Real Mode toggle, Apply (writes
+  `ICONDATA_VMS` with backup-on-replace), Save (appends to
+  library), Name (opens on-screen keyboard for the description
+  field — real maple keyboards also feed into the same buffer).
 - **VMU Save Browser** — enumerates every save on every detected
   VMU with thumbnail decode. A loads an icon into the editor;
   Y applies it directly to its source VMU's `ICONDATA_VMS`; X
   refreshes the list. Read-only on game saves.
+- **Library Browser** — read-back UI for `VMUICONS.VMS` library
+  saves. Lists every entry across every VMU with thumbnail and
+  flag indicators (`*` = auto-backup, `R` = Real Mode set). A
+  loads to editor; B prompts to delete; X refreshes.
 - **About** — version, detected cable, region, mode.
 
 ## VGA detection

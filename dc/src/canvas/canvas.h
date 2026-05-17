@@ -46,8 +46,14 @@ typedef struct {
     uint8_t  color_indices[JT_CANVAS_W * JT_CANVAS_H];
     uint8_t  mono_bits[JT_CANVAS_W * JT_CANVAS_H / 8];
 
+    /* Mono palette toggle state — one bool per color-palette index.
+     * Mirrors the web app's mono-palette panel: toggling index N flips
+     * every mono pixel whose color_index == N to the toggle state.
+     * jt_canvas_mono_toggle_palette() applies a flip + cascade. */
+    bool mono_palette_states[JT_PALETTE_ENTRIES];
+
     /* Active editor state. */
-    jt_canvas_layer_t layer;            /* color or mono */
+    jt_canvas_layer_t layer;            /* color or mono (which pane has focus) */
     jt_tool_t         tool;
     uint8_t           current_color;    /* 0..15, color-layer index */
     bool              real_mode_flag;
@@ -95,5 +101,20 @@ uint16_t jt_canvas_pixel_argb1555(const jt_canvas_t *c, int x, int y);
  * 32 bits per row. */
 bool jt_canvas_mono_get(const jt_canvas_t *c, int x, int y);
 void jt_canvas_mono_set(jt_canvas_t *c, int x, int y, bool on);
+
+/* Flip mono_palette_states[idx] and cascade the new state to every
+ * mono pixel whose color_index == idx. Pushes one undo snapshot. */
+void jt_canvas_mono_toggle_palette(jt_canvas_t *c, int idx);
+
+/* Recompute mono_palette_states[] from the current mono_bits +
+ * color_indices: a palette index is considered "on" only if every
+ * color-canvas pixel of that index has its mono bit on. Called after
+ * direct mono painting so the toggle row stays in sync. */
+void jt_canvas_mono_sync_palette(jt_canvas_t *c);
+
+/* Bulk operations matching the web app's per-canvas buttons. */
+void jt_canvas_mono_invert(jt_canvas_t *c);
+void jt_canvas_color_reset(jt_canvas_t *c);   /* reload default palette, all white */
+void jt_canvas_mono_reset(jt_canvas_t *c);    /* clear mono bits + palette states */
 
 #endif /* JT_CANVAS_HDR */

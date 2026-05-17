@@ -31,6 +31,7 @@
 #include "modes/tester.h"
 #include "modes/vmu_editor.h"
 #include "modes/browser.h"
+#include "modes/lib_browser.h"
 #include "modes/about.h"
 
 KOS_INIT_FLAGS(INIT_DEFAULT | INIT_MALLOCSTATS);
@@ -41,10 +42,11 @@ static jt_mode_id_t pending_mode = JT_MODE_TESTER;
 /* Mode registry. Index matches jt_mode_id_t. New modes append here
  * and to the enum in app.h. */
 static const jt_mode_t * const mode_table[JT_MODE_COUNT] = {
-    [JT_MODE_TESTER]     = &jt_mode_tester,
-    [JT_MODE_VMU_EDITOR] = &jt_mode_vmu_editor,
-    [JT_MODE_BROWSER]    = &jt_mode_browser,
-    [JT_MODE_ABOUT]      = &jt_mode_about,
+    [JT_MODE_TESTER]      = &jt_mode_tester,
+    [JT_MODE_VMU_EDITOR]  = &jt_mode_vmu_editor,
+    [JT_MODE_BROWSER]     = &jt_mode_browser,
+    [JT_MODE_LIB_BROWSER] = &jt_mode_lib_browser,
+    [JT_MODE_ABOUT]       = &jt_mode_about,
 };
 
 void jt_request_mode(jt_mode_id_t next)

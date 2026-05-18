@@ -22,6 +22,10 @@ case "${1:-build}" in
             -u "$(id -u):$(id -g)" \
             "$IMAGE_TAG" \
             make
+        # Mirror the .z64 into build/ post-make so artifact paths match
+        # the other consoles. Done outside make to avoid the %.z64
+        # pattern from n64.mk applying target-specific LDFLAGS twice.
+        cp -f joypad-tester.z64 build/joypad-tester.z64
         echo "Built build/joypad-tester.z64"
         ;;
     clean)

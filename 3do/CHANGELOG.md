@@ -1,5 +1,28 @@
 # Joypad Tester — 3DO — Changelog
 
+## v1.0.1 — 2026-05-19
+
+Re-release of the 3DO tester. The v1.0.0 ISO uploaded to the GitHub
+release ended up with a bad on-disc signature block — the 3DO BIOS
+shows the developer splash and then hands off to blackness instead
+of running the tester. Rebuilding from the same source produces a
+working ISO, so this point release replaces the broken artifact and
+folds in two follow-up improvements that had landed on `main`.
+
+### Highlights
+
+- Speculative Steering-wheel driverlet bound to PBUS class `0x0F`
+  with a dedicated "Wheel" row that renders eight raw button slots
+  + W (steering) / T (throttle) / B (brake) axis values. Dormant
+  until a wheel pod attaches; no runtime cost on existing setups.
+  Byte-to-axis layout is a guess until real-hardware data comes back.
+- Keyboard Caps Lock now toggles the keyboard's physical LED — a
+  press flips a local flag and broadcasts
+  `GENERIC_KEYBOARD_SetLEDs` over the pod chain; non-keyboard pods
+  silently reject. Pause/Break (scancode `0x84`) also renders
+  cleanly now that the upstream driverlet emits a synthetic press
+  for the E1 sequence.
+
 ## v1.0.0 — 2026-05-14
 
 First production release. The earlier v0.1.0 was a single-pad

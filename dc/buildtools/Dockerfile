@@ -67,8 +67,33 @@ RUN mkdir -p /opt/toolchains/dc \
 # compilers via kos-chain. The 'stable' profile is GCC 15.2.0 as of
 # 2025-08-08 per utils/kos-chain/Makefile.dreamcast.cfg. Outputs land
 # at /opt/toolchains/dc/sh-elf and /opt/toolchains/dc/arm-eabi.
+#
+# Two layers of retry hardening because the upstream ftpmirror.gnu.org
+# redirects to regional GNU mirrors that periodically return 502 /
+# connection-refused for the GCC tarball, and a single transient
+# failure was breaking CI:
+#   1. A global ~/.curlrc tells every curl invocation in the kos-chain
+#      build to retry up to 6 times with backoff (handles single-URL
+#      blips).
+#   2. The `make build` itself is wrapped in a 5-attempt shell loop
+#      with a 30 s sleep between attempts (handles a mirror that's
+#      down long enough to exhaust the curl retries).
+RUN printf '%s\n' \
+    'retry = 6' \
+    'retry-delay = 10' \
+    'retry-max-time = 120' \
+    'retry-connrefused' \
+    'connect-timeout = 30' \
+    > /root/.curlrc
+
 RUN cd /opt/toolchains/dc/kos/utils/kos-chain \
- && make build platform=dreamcast toolchain_profile=stable
+ && for attempt in 1 2 3 4 5; do \
+      echo ">> kos-chain build attempt $attempt"; \
+      make build platform=dreamcast toolchain_profile=stable && break; \
+      echo ">> attempt $attempt failed; sleeping 30s before retry"; \
+      sleep 30; \
+    done \
+ && test -x /opt/toolchains/dc/sh-elf/bin/sh-elf-gcc
 
 # Set up environ.sh from the upstream sample. Its default paths
 # already match /opt/toolchains/dc/, so no edits are needed for this

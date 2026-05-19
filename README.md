@@ -28,16 +28,26 @@ A collection of homebrew controller test ROMs across game consoles. Each console
 
 | Console | Status | Path | License |
 |---|---|---|---|
-| GameCube | working | [`gcn/`](gcn/) | [zlib](gcn/LICENSE.md) |
-| Game Boy Advance | working | [`gba/`](gba/) | [MIT](gba/LICENSE.md) |
-| PC Engine | working | [`pce/`](pce/) | [MIT](pce/LICENSE.md) |
-| 3DO | working | [`3do/`](3do/) | [MIT](3do/LICENSE.md) |
-| Dreamcast | working | [`dc/`](dc/) | [MIT](dc/LICENSE.md) |
-| Nintendo 64 | working | [`n64/`](n64/) | [MIT](n64/LICENSE.md) |
+| 3DO | released | [`3do/`](3do/) | [MIT](3do/LICENSE.md) |
+| Game Boy Advance | released | [`gba/`](gba/) | [MIT](gba/LICENSE.md) |
+| GameCube | released | [`gcn/`](gcn/) | [zlib](gcn/LICENSE.md) |
+| PC Engine | released | [`pce/`](pce/) | [MIT](pce/LICENSE.md) |
+| Dreamcast | beta | [`dc/`](dc/) | [MIT](dc/LICENSE.md) |
+| Nintendo 64 | beta | [`n64/`](n64/) | [MIT](n64/LICENSE.md) |
+| NUON | alpha | [`nuon/`](nuon/) | [MIT](nuon/LICENSE.md) |
+| NES | planned | — | — |
+| SNES | planned | — | — |
+| Xbox | planned | — | — |
 
-Subdirs use short 3-letter codenames (`gcn`, `gba`, `pce`, `dc`, `n64`,
-future `snes`/…) matching homebrew-community conventions. Release tags
-follow the same prefix: `<codename>-v<semver>`.
+**Status legend:** *released* = stable, no known issues. *beta* =
+nearly complete, may have rough edges or unreleased polish. *alpha* =
+boots but core functionality still in progress. *planned* = on the
+roadmap, not started.
+
+Subdirs use short 3-letter codenames (`3do`, `gba`, `gcn`, `pce`,
+`dc`, `n64`, `nuon`, future `nes` / `snes` / `xbox`) matching
+homebrew-community conventions. Release tags follow the same prefix:
+`<codename>-v<semver>`.
 
 ## Acknowledgements
 

@@ -40,8 +40,16 @@ static bool         needs_refresh = true;
 static bool         confirm_delete = false;
 static uint32_t     last_btns = 0;
 
-static void enter_mode(void)  { needs_refresh = true; selected = 0; scroll_top = 0;
-                                confirm_delete = false; }
+static uint32_t aggregate_pad_buttons(void);   /* forward decl */
+
+static void enter_mode(void)
+{
+    needs_refresh = true;
+    selected = 0;
+    scroll_top = 0;
+    confirm_delete = false;
+    last_btns = aggregate_pad_buttons();
+}
 static void leave_mode(void)  { }
 
 static void refresh(void)
@@ -126,7 +134,7 @@ static void update_mode(float dt)
     if (edges & CONT_A)         load_selected_to_editor();
     if (edges & CONT_B)         confirm_delete = (flat_count > 0);
 
-    const int VISIBLE = 14;
+    const int VISIBLE = 13;
     if (selected < scroll_top) scroll_top = selected;
     if (selected >= scroll_top + VISIBLE) scroll_top = selected - VISIBLE + 1;
 
@@ -160,7 +168,20 @@ static void draw_thumb(int sx, int sy, const jt_icon_t *icon, int size_px)
 
 static void draw_mode(void)
 {
-    jt_text_centered(8, JT_COL_YELLOW, JT_COL_BLACK, "Library Browser");
+    /* Track empty -> populated transition so the "No entries" placeholder
+     * text doesn't ghost behind freshly-loaded list rows. */
+    static bool was_empty = true;
+    bool is_empty = (flat_count == 0);
+    if (was_empty && !is_empty) {
+        /* Clear the placeholder area + list region in one wipe. */
+        for (int y = 200; y < 320; y++) {
+            uint16_t *p = vram_s + y * 640;
+            for (int x = 0; x < 640; x++) p[x] = 0;
+        }
+    }
+    was_empty = is_empty;
+
+    jt_text_centered(8, JT_COL_YELLOW, JT_COL_BLACK, "VMU Icon Library");
 
     if (flat_count == 0) {
         jt_text_centered(220, JT_COL_WHITE, JT_COL_BLACK,
@@ -170,12 +191,12 @@ static void draw_mode(void)
         jt_text_centered(284, JT_COL_GREY, JT_COL_BLACK,
                          "X: refresh");
         jt_text_centered(456, JT_COL_GREEN, JT_COL_BLACK,
-                         "Hold Start+Down for options menu");
+                         "Start: options menu");
         return;
     }
 
     int row_h = 28;
-    for (int row = 0; row < 14 && scroll_top + row < flat_count; row++) {
+    for (int row = 0; row < 13 && scroll_top + row < flat_count; row++) {
         int idx = scroll_top + row;
         flat_entry_t *fe = &flat[idx];
         int y = 40 + row * row_h;
@@ -201,16 +222,16 @@ static void draw_mode(void)
                          "A: confirm   B: cancel");
     }
 
-    jt_text_centered(420, JT_COL_GREY, JT_COL_BLACK,
-                     "Up/Down select   A: load to editor   B: delete   X: refresh");
-    jt_text_centered(444, JT_COL_GREY, JT_COL_BLACK,
-                     "* = auto-backup    R = Real Mode flag set");
-    jt_text_centered(468, JT_COL_GREEN, JT_COL_BLACK,
-                     "Hold Start+Down for options menu");
+    jt_text_centered(408, JT_COL_GREY, JT_COL_BLACK,
+                     "Up/Down   A: load   B: delete   X: refresh");
+    jt_text_centered(432, JT_COL_GREY, JT_COL_BLACK,
+                     "* = auto-backup    R = Real Mode");
+    jt_text_centered(456, JT_COL_GREEN, JT_COL_BLACK,
+                     "Start: options menu");
 }
 
 const jt_mode_t jt_mode_lib_browser = {
-    .name   = "Library Browser",
+    .name   = "VMU Icon Library",
     .enter  = enter_mode,
     .leave  = leave_mode,
     .update = update_mode,

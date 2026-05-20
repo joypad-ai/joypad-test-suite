@@ -63,6 +63,18 @@ static bool   has_pending_consume = false;
 static char   pending_text[JT_OSK_MAX_LEN + 1];
 static uint32_t last_btns = 0;
 
+static uint32_t aggregate_pad_buttons(void);
+
+/* Redraw is expensive (~50 bfont calls per frame). Track state so we
+ * only paint on actual change — open / close, layer flip, hover move,
+ * text-buffer change. Otherwise the beam catches mid-draw and the
+ * panel flickers. */
+static bool   needs_redraw = true;
+static int    last_drawn_layer = -1;
+static int    last_drawn_hover_row = -1;
+static int    last_drawn_hover_col = -1;
+static size_t last_drawn_text_len = (size_t)-1;
+
 void jt_osk_begin(const char *label, const char *initial, size_t max_len)
 {
     visible = true;
@@ -71,7 +83,11 @@ void jt_osk_begin(const char *label, const char *initial, size_t max_len)
     layer = 0;
     hover_row = 0;
     hover_col = 0;
-    last_btns = 0;
+    /* Seed last_btns with the buttons currently held so the press that
+     * opened the OSK (typically A on a picker / button) doesn't appear
+     * as a fresh edge on the next frame and immediately type the
+     * hovered key. */
+    last_btns = aggregate_pad_buttons();
     strncpy(label_buf, label ? label : "", sizeof(label_buf) - 1);
     label_buf[sizeof(label_buf) - 1] = '\0';
     text_cap = (max_len > 0 && max_len <= JT_OSK_MAX_LEN) ? max_len : JT_OSK_MAX_LEN;
@@ -83,6 +99,13 @@ void jt_osk_begin(const char *label, const char *initial, size_t max_len)
         text_len = n;
     }
     text_buf[text_len] = '\0';
+
+    /* Force a fresh full redraw on open. */
+    needs_redraw = true;
+    last_drawn_layer = -1;
+    last_drawn_hover_row = -1;
+    last_drawn_hover_col = -1;
+    last_drawn_text_len = (size_t)-1;
 }
 
 bool jt_osk_visible(void) { return visible; }
@@ -201,8 +224,10 @@ void jt_osk_update(float dt)
     uint32_t btns = aggregate_pad_buttons();
     uint32_t edges = btns & ~last_btns;
 
+    /* Hover bounds: rows 0..3 are QWERTY layers, row 4 is the
+     * function bar -> max valid row index is ROWS - 1 (= 4). */
     if (edges & CONT_DPAD_UP)    if (hover_row > 0) hover_row--;
-    if (edges & CONT_DPAD_DOWN)  if (hover_row < ROWS - 2) hover_row++;
+    if (edges & CONT_DPAD_DOWN)  if (hover_row < ROWS - 1) hover_row++;
     if (edges & CONT_DPAD_LEFT)  if (hover_col > 0) hover_col--;
     if (edges & CONT_DPAD_RIGHT) if (hover_col < COLS - 1) hover_col++;
 
@@ -267,6 +292,22 @@ static const char *func_label(int col)
 void jt_osk_draw(void)
 {
     if (!visible) return;
+
+    /* Only redraw on actual state change. The OSK paint is ~50 bfont
+     * calls; doing that every frame races the beam and causes the
+     * panel to flicker. Most frames the OSK is stable -> noop. */
+    if (!needs_redraw &&
+        layer == last_drawn_layer &&
+        hover_row == last_drawn_hover_row &&
+        hover_col == last_drawn_hover_col &&
+        text_len == last_drawn_text_len) {
+        return;
+    }
+    needs_redraw = false;
+    last_drawn_layer = layer;
+    last_drawn_hover_row = hover_row;
+    last_drawn_hover_col = hover_col;
+    last_drawn_text_len = text_len;
 
     /* Backdrop panel: 580 x 280, centered. */
     fill_rect(30, 90, 580, 350, JT_COL_BLACK);

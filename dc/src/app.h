@@ -16,16 +16,21 @@
 #include <stdint.h>
 #include <stddef.h>
 
-#define JT_VERSION_STR "0.1.0"
+/* The version string is injected by the Makefile (-D flag) from the
+ * VERSION file at the dc/ root. The fallback below only kicks in for
+ * out-of-tree builds where the Makefile isn't doing that work. */
+#ifndef JT_VERSION_STR
+#define JT_VERSION_STR "0.0.0-dev"
+#endif
 
 /* Modes the options menu can switch between. New modes append to
  * this enum AND register a jt_mode_t entry in main.c's mode_table[].
  * Order here determines menu order. */
 typedef enum {
     JT_MODE_TESTER = 0,
+    JT_MODE_BROWSER,        /* VMU File Manager */
     JT_MODE_VMU_EDITOR,
-    JT_MODE_BROWSER,
-    JT_MODE_LIB_BROWSER,
+    JT_MODE_LIB_BROWSER,    /* VMU Icon Library */
     JT_MODE_ABOUT,
     JT_MODE_COUNT
 } jt_mode_id_t;

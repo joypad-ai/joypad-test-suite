@@ -22,12 +22,13 @@ typedef enum {
     JT_LAYER_MONO,
 } jt_canvas_layer_t;
 
+/* Matches the web app's tool set: just two modes. The "primary vs
+ * secondary color" concept (A vs B button) replaces the older erase /
+ * pick / swap tools — there's no transparent state in a VMU icon, so
+ * erasing is just painting with a different color. */
 typedef enum {
-    JT_TOOL_PAINT = 0,    /* single-pixel set */
-    JT_TOOL_ERASE,        /* single-pixel clear (color 0 / mono off) */
-    JT_TOOL_FILL,         /* flood fill */
-    JT_TOOL_PICK,         /* sample pixel value into current color */
-    JT_TOOL_SWAP,         /* global replace: all pixels of source color -> current */
+    JT_TOOL_DRAW = 0,     /* single-pixel set with primary/secondary */
+    JT_TOOL_FILL,         /* flood fill with primary/secondary */
     JT_TOOL_COUNT
 } jt_tool_t;
 
@@ -56,7 +57,8 @@ typedef struct {
     /* Active editor state. */
     jt_canvas_layer_t layer;            /* color or mono (which pane has focus) */
     jt_tool_t         tool;
-    uint8_t           current_color;    /* 0..15, color-layer index */
+    uint8_t           primary_color;    /* 0..15, painted by A / left-click */
+    uint8_t           secondary_color;  /* 0..15, painted by B / right-click */
     bool              real_mode_flag;
     char              description[16];
 
@@ -79,24 +81,15 @@ void jt_canvas_to_icon  (const jt_canvas_t *c, jt_icon_t *icon);
 void jt_canvas_push_undo(jt_canvas_t *c);
 bool jt_canvas_undo(jt_canvas_t *c);
 
-/* Single-pixel ops. Coordinates are canvas-space (0..31). Out-of-range
- * coords are silently ignored. set_pixel writes the current_color
- * (or mono on/off per layer). erase_pixel writes 0 / off. */
-void jt_canvas_set_pixel  (jt_canvas_t *c, int x, int y);
-void jt_canvas_erase_pixel(jt_canvas_t *c, int x, int y);
+/* Single-pixel paint (color layer). Coordinates are canvas-space
+ * (0..31). Out-of-range coords are silently ignored. */
+void jt_canvas_paint_color(jt_canvas_t *c, int x, int y, uint8_t color_idx);
 
-/* Bucket fill — same-value flood from (x, y) until value boundary
- * (or canvas edge). Pushes a single undo snapshot at entry. */
-void jt_canvas_fill(jt_canvas_t *c, int x, int y);
-
-/* Color swap: replace every pixel whose color index matches the
- * pixel at (x, y) with current_color globally. Color layer only.
- * Pushes one undo snapshot. */
-void jt_canvas_swap_color(jt_canvas_t *c, int x, int y);
-
-/* Sample whatever the pixel at (x, y) is into current_color. No
- * mutation, no undo. */
-void jt_canvas_pick(jt_canvas_t *c, int x, int y);
+/* Bucket flood-fill from (x, y), replacing all 4-connected pixels of
+ * the same source value with color_idx (color layer) or `on` (mono).
+ * Pushes one undo snapshot. No-op if already at the target value. */
+void jt_canvas_fill_color(jt_canvas_t *c, int x, int y, uint8_t color_idx);
+void jt_canvas_mono_fill (jt_canvas_t *c, int x, int y, bool on);
 
 /* Read a pixel as the editor would render it (mapping color index
  * via palette, or mono bit -> black/white). Returns ARGB1555. Used

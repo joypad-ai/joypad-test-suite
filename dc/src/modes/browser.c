@@ -51,6 +51,8 @@ static int selected = 0;
 static int scroll_top = 0;
 static bool needs_refresh = true;
 
+static uint32_t aggregate_pad_buttons(void);   /* forward decl */
+
 /* Animation time accumulator. Header anim_speed is roughly "ticks
  * between frames"; treating it as ~60Hz ticks gives reasonable
  * cadence for the typical Sega-shipped values. */
@@ -88,6 +90,9 @@ static void browser_enter(void)
     needs_refresh = true;
     selected = 0;
     scroll_top = 0;
+    /* Sync edge tracking so a Start press that landed us here (via the
+     * options menu) doesn't immediately fire as a fresh edge. */
+    last_btns = aggregate_pad_buttons();
 }
 
 static void browser_leave(void) { /* nothing */ }
@@ -215,7 +220,7 @@ static void browser_update(float dt)
         }
     }
     /* Keep selection visible in viewport. */
-    const int VISIBLE_ROWS = 14;
+    const int VISIBLE_ROWS = 13;
     if (selected < scroll_top) scroll_top = selected;
     if (selected >= scroll_top + VISIBLE_ROWS) scroll_top = selected - VISIBLE_ROWS + 1;
 
@@ -253,7 +258,19 @@ static void draw_thumb(int sx, int sy, const jt_icon_t *icon, int size_px)
 
 static void browser_draw(void)
 {
-    jt_text_centered(8, JT_COL_YELLOW, JT_COL_BLACK, "VMU Save Browser");
+    /* Track empty -> populated transition so the "No saves" placeholder
+     * doesn't ghost behind freshly-loaded list rows. */
+    static bool was_empty = true;
+    bool is_empty = (entry_count == 0);
+    if (was_empty && !is_empty) {
+        for (int y = 200; y < 320; y++) {
+            uint16_t *p = vram_s + y * 640;
+            for (int x = 0; x < 640; x++) p[x] = 0;
+        }
+    }
+    was_empty = is_empty;
+
+    jt_text_centered(8, JT_COL_YELLOW, JT_COL_BLACK, "VMU File Manager");
 
     if (entry_count == 0) {
         jt_text_centered(220, JT_COL_WHITE, JT_COL_BLACK,
@@ -261,14 +278,14 @@ static void browser_draw(void)
         jt_text_centered(252, JT_COL_GREY, JT_COL_BLACK,
                          "Plug in a VMU and press X to refresh.");
         jt_text_centered(456, JT_COL_GREEN, JT_COL_BLACK,
-                         "Hold Start+Down for options menu");
+                         "Start: options menu");
         return;
     }
 
     /* List rows starting at y=40, 28px stride for the 24px-tall thumb
      * + a few px breathing room. */
     int row_h = 28;
-    for (int row = 0; row < 14 && scroll_top + row < entry_count; row++) {
+    for (int row = 0; row < 13 && scroll_top + row < entry_count; row++) {
         browser_entry_t *e = &entries[scroll_top + row];
         int idx = scroll_top + row;
         int y = 40 + row * row_h;
@@ -301,13 +318,15 @@ static void browser_draw(void)
                 anim_mark, e->filename, e->blocks);
     }
 
-    /* Footer instructions. */
-    jt_text_centered(420, JT_COL_GREY, JT_COL_BLACK,
-                     "Up/Down select   A: extract to editor   Y: apply to source");
-    jt_text_centered(444, JT_COL_GREY, JT_COL_BLACK,
-                     "X: refresh list");
-    jt_text_centered(468, JT_COL_GREEN, JT_COL_BLACK,
-                     "Hold Start+Down for options menu");
+    /* Footer instructions. Three lines pinned to bottom; last row of
+     * the list lands at most at y=40 + 13*28 = 404 so y=408 onward
+     * is clear. */
+    jt_text_centered(408, JT_COL_GREY, JT_COL_BLACK,
+                     "Up/Down select   A: extract   Y: apply");
+    jt_text_centered(432, JT_COL_GREY, JT_COL_BLACK,
+                     "X: refresh");
+    jt_text_centered(456, JT_COL_GREEN, JT_COL_BLACK,
+                     "Start: options menu");
 }
 
 const jt_mode_t jt_mode_browser = {

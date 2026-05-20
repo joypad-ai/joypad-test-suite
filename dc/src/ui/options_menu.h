@@ -11,4 +11,10 @@ void jt_options_menu_update(float dt);
 void jt_options_menu_draw(void);
 bool jt_options_menu_visible(void);
 
+/* True for the single frame on which the menu closed (after confirm or
+ * cancel). Lets main.c skip mode->update on that frame so the
+ * confirming Start press doesn't leak through into the newly-active
+ * mode's input handler. */
+bool jt_options_menu_just_closed(void);
+
 #endif

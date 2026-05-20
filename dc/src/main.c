@@ -28,6 +28,7 @@
 #include "ports/ports.h"
 #include "input/cursor.h"
 #include "ui/options_menu.h"
+#include "ui/screensaver.h"
 #include "modes/tester.h"
 #include "modes/vmu_editor.h"
 #include "modes/browser.h"
@@ -89,6 +90,7 @@ int main(int argc, char **argv)
     jt_ports_init();
     jt_cursor_init(320, 240);
     jt_options_menu_init();
+    jt_screensaver_init();
 
     /* One-time clear so the boot framebuffer doesn't show garbage.
      * Subsequent frames don't memset — opaque-mode bfont repaints
@@ -115,9 +117,15 @@ int main(int argc, char **argv)
 
         jt_ports_poll();
         jt_cursor_update(dt);
+        jt_screensaver_tick(dt);
         jt_options_menu_update(dt);
 
-        if (!jt_options_menu_visible()) {
+        /* Skip mode-update when the menu is visible OR when it just
+         * closed this frame. Otherwise the confirming Start press
+         * would leak through into the newly-active mode's input
+         * handler on the same frame it landed there. */
+        if (!jt_options_menu_visible() && !jt_options_menu_just_closed()
+            && !jt_screensaver_active()) {
             mode_table[jt_current_mode]->update(dt);
         }
 
@@ -133,18 +141,45 @@ int main(int argc, char **argv)
          * glyph writes land before the scan catches up. */
         vid_waitvbl();
 
-        /* When the options menu opens or closes, clear the framebuffer
-         * once so we don't see stale pixels from the prior layer. */
-        bool menu_now = jt_options_menu_visible();
-        if (menu_now != last_menu_visible) {
+        /* Menu open/close transition handling. Clearing the WHOLE
+         * framebuffer on transition causes a black-flash flicker
+         * because single-buffer mode means the beam can see the
+         * cleared state before the next draw lands. Instead:
+         *   - On OPEN: don't clear at all. The menu paints opaquely
+         *     over its 380x220 box; areas outside stay as the prior
+         *     mode's UI (intentional "dimmed copy" effect).
+         *   - On CLOSE: clear only the menu's box region so the
+         *     newly-visible mode's redraw doesn't show leftover
+         *     menu pixels at edges the mode doesn't repaint. */
+        /* Screensaver wake: leftover logo pixels need wiping and the
+         * resuming mode's cached-static-UI flag needs invalidating so
+         * it repaints itself fresh. */
+        if (jt_screensaver_consume_wake()) {
             clear_framebuffer();
-            last_menu_visible = menu_now;
+            /* The editor gates its static UI redraw on an internal
+             * dirty flag; force it via its public hook below. */
+            extern void jt_editor_invalidate(void);
+            jt_editor_invalidate();
         }
+
+        bool menu_now = jt_options_menu_visible();
+        if (last_menu_visible && !menu_now) {
+            /* Menu just closed -- wipe its box so the mode below has
+             * a clean slate to repaint into. */
+            const int mx = 130, my = 130, mw = 380, mh = 220;
+            for (int j = 0; j < mh; j++) {
+                uint16_t *row = vram_s + (my + j) * 640 + mx;
+                for (int i = 0; i < mw; i++) row[i] = 0;
+            }
+        }
+        last_menu_visible = menu_now;
 
         /* Only one layer redraws per frame. Drawing both the mode and
          * the menu means they race on overlapping pixels in single-
          * buffer mode (menu box overlaps Port B/C rows -> flicker). */
-        if (menu_now) {
+        if (jt_screensaver_active()) {
+            jt_screensaver_draw();
+        } else if (menu_now) {
             jt_options_menu_draw();
         } else {
             mode_table[jt_current_mode]->draw();

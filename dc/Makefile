@@ -15,6 +15,11 @@ TARGET   := joypad-tester-dreamcast
 BUILDDIR := build
 SRCDIR   := src
 
+# Single source of truth for the version: dc/VERSION. The string gets
+# injected at compile time so app.h's JT_VERSION_STR macro stays in
+# sync without us touching the source.
+VERSION := $(shell cat VERSION | tr -d '[:space:]')
+
 # Source layout. Keep modes/* / input/* / ports/* / ui/* / video/*
 # as discrete translation units so future testers can adopt the
 # scaffold by copying matching subdirs.
@@ -26,6 +31,7 @@ SOURCES := \
     $(SRCDIR)/ui/bfont_util.c \
     $(SRCDIR)/ui/options_menu.c \
     $(SRCDIR)/ui/osk.c \
+    $(SRCDIR)/ui/screensaver.c \
     $(SRCDIR)/vms/vms.c \
     $(SRCDIR)/vms/apply.c \
     $(SRCDIR)/library/library.c \
@@ -38,7 +44,8 @@ SOURCES := \
 
 OBJECTS := $(patsubst $(SRCDIR)/%.c,$(BUILDDIR)/%.o,$(SOURCES))
 
-CFLAGS  += -Wall -Wextra -Wno-unused-parameter -I$(SRCDIR)
+CFLAGS  += -Wall -Wextra -Wno-unused-parameter -I$(SRCDIR) \
+           -DJT_VERSION_STR=\"$(VERSION)\"
 
 ELF := $(BUILDDIR)/$(TARGET).elf
 CDI := $(BUILDDIR)/$(TARGET).cdi

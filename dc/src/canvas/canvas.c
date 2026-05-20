@@ -50,8 +50,11 @@ void jt_canvas_init(jt_canvas_t *c)
     /* Blank canvas = all white (palette index 1), all mono pixels off. */
     memset(c->color_indices, 1, sizeof(c->color_indices));
     c->layer = JT_LAYER_COLOR;
-    c->tool = JT_TOOL_PAINT;
-    c->current_color = 0;   /* default to black for first stroke */
+    c->tool = JT_TOOL_DRAW;
+    /* Match the web app's defaults: primary = index 0 (black, left
+     * click), secondary = index 1 (white, right click). */
+    c->primary_color = 0;
+    c->secondary_color = 1;
     c->real_mode_flag = false;
 }
 
@@ -115,85 +118,59 @@ void jt_canvas_mono_set(jt_canvas_t *c, int x, int y, bool on)
     else    c->mono_bits[p / 8] &= (uint8_t)~mask;
 }
 
-void jt_canvas_set_pixel(jt_canvas_t *c, int x, int y)
+void jt_canvas_paint_color(jt_canvas_t *c, int x, int y, uint8_t color_idx)
 {
     if (!in_bounds(x, y)) return;
-    if (c->layer == JT_LAYER_COLOR) {
-        c->color_indices[idx_for(x, y)] = c->current_color & 0x0F;
-    } else {
-        jt_canvas_mono_set(c, x, y, true);
-    }
+    c->color_indices[idx_for(x, y)] = color_idx & 0x0F;
 }
 
-void jt_canvas_erase_pixel(jt_canvas_t *c, int x, int y)
-{
-    if (!in_bounds(x, y)) return;
-    if (c->layer == JT_LAYER_COLOR) {
-        /* "Erase" = paint with palette index 1 (white) by convention.
-         * The user can change palette[1] if they want a different
-         * erase color; mirrors the JS app's secondary-color erase. */
-        c->color_indices[idx_for(x, y)] = 1;
-    } else {
-        jt_canvas_mono_set(c, x, y, false);
-    }
-}
-
-void jt_canvas_pick(jt_canvas_t *c, int x, int y)
-{
-    if (!in_bounds(x, y)) return;
-    if (c->layer == JT_LAYER_COLOR) {
-        c->current_color = c->color_indices[idx_for(x, y)];
-    }
-    /* Mono layer has no current_color concept; no-op. */
-}
-
-/* Iterative flood fill (4-connected). Uses a stack on a small static
- * buffer — canvas is 32x32 = 1024 cells max, well within. */
-void jt_canvas_fill(jt_canvas_t *c, int x, int y)
+/* Iterative flood fill (4-connected). 32x32 = 1024 cells max, so the
+ * fixed-size stack is plenty. */
+void jt_canvas_mono_fill(jt_canvas_t *c, int x, int y, bool on)
 {
     if (!in_bounds(x, y)) return;
     jt_canvas_push_undo(c);
-
-    if (c->layer == JT_LAYER_MONO) {
-        bool target = jt_canvas_mono_get(c, x, y);
-        bool replace_with = (c->tool == JT_TOOL_ERASE) ? false : true;
-        if (target == replace_with) return;
-        /* Tiny stack flood. */
-        int stack_x[1024], stack_y[1024];
-        int sp = 0;
-        stack_x[sp] = x; stack_y[sp] = y; sp++;
-        while (sp > 0) {
-            sp--;
-            int cx = stack_x[sp], cy = stack_y[sp];
-            if (!in_bounds(cx, cy)) continue;
-            if (jt_canvas_mono_get(c, cx, cy) != target) continue;
-            jt_canvas_mono_set(c, cx, cy, replace_with);
-            if (sp + 4 <= 1024) {
-                stack_x[sp] = cx + 1; stack_y[sp] = cy;     sp++;
-                stack_x[sp] = cx - 1; stack_y[sp] = cy;     sp++;
-                stack_x[sp] = cx;     stack_y[sp] = cy + 1; sp++;
-                stack_x[sp] = cx;     stack_y[sp] = cy - 1; sp++;
-            }
+    bool target = jt_canvas_mono_get(c, x, y);
+    if (target == on) return;
+    int stack_x[1024], stack_y[1024];
+    int sp = 0;
+    stack_x[sp] = x; stack_y[sp] = y; sp++;
+    while (sp > 0) {
+        sp--;
+        int cx = stack_x[sp], cy = stack_y[sp];
+        if (!in_bounds(cx, cy)) continue;
+        if (jt_canvas_mono_get(c, cx, cy) != target) continue;
+        jt_canvas_mono_set(c, cx, cy, on);
+        if (sp + 4 <= 1024) {
+            stack_x[sp] = cx + 1; stack_y[sp] = cy;     sp++;
+            stack_x[sp] = cx - 1; stack_y[sp] = cy;     sp++;
+            stack_x[sp] = cx;     stack_y[sp] = cy + 1; sp++;
+            stack_x[sp] = cx;     stack_y[sp] = cy - 1; sp++;
         }
-    } else {
-        uint8_t target = c->color_indices[idx_for(x, y)];
-        uint8_t replace_with = (c->tool == JT_TOOL_ERASE) ? 1 : (c->current_color & 0x0F);
-        if (target == replace_with) return;
-        int stack_x[1024], stack_y[1024];
-        int sp = 0;
-        stack_x[sp] = x; stack_y[sp] = y; sp++;
-        while (sp > 0) {
-            sp--;
-            int cx = stack_x[sp], cy = stack_y[sp];
-            if (!in_bounds(cx, cy)) continue;
-            if (c->color_indices[idx_for(cx, cy)] != target) continue;
-            c->color_indices[idx_for(cx, cy)] = replace_with;
-            if (sp + 4 <= 1024) {
-                stack_x[sp] = cx + 1; stack_y[sp] = cy;     sp++;
-                stack_x[sp] = cx - 1; stack_y[sp] = cy;     sp++;
-                stack_x[sp] = cx;     stack_y[sp] = cy + 1; sp++;
-                stack_x[sp] = cx;     stack_y[sp] = cy - 1; sp++;
-            }
+    }
+}
+
+void jt_canvas_fill_color(jt_canvas_t *c, int x, int y, uint8_t color_idx)
+{
+    if (!in_bounds(x, y)) return;
+    jt_canvas_push_undo(c);
+    uint8_t target = c->color_indices[idx_for(x, y)] & 0x0F;
+    uint8_t replace_with = color_idx & 0x0F;
+    if (target == replace_with) return;
+    int stack_x[1024], stack_y[1024];
+    int sp = 0;
+    stack_x[sp] = x; stack_y[sp] = y; sp++;
+    while (sp > 0) {
+        sp--;
+        int cx = stack_x[sp], cy = stack_y[sp];
+        if (!in_bounds(cx, cy)) continue;
+        if ((c->color_indices[idx_for(cx, cy)] & 0x0F) != target) continue;
+        c->color_indices[idx_for(cx, cy)] = replace_with;
+        if (sp + 4 <= 1024) {
+            stack_x[sp] = cx + 1; stack_y[sp] = cy;     sp++;
+            stack_x[sp] = cx - 1; stack_y[sp] = cy;     sp++;
+            stack_x[sp] = cx;     stack_y[sp] = cy + 1; sp++;
+            stack_x[sp] = cx;     stack_y[sp] = cy - 1; sp++;
         }
     }
 }
@@ -249,7 +226,8 @@ void jt_canvas_color_reset(jt_canvas_t *c)
                                         default_palette[i].a);
     }
     memset(c->color_indices, 1, sizeof(c->color_indices)); /* all white */
-    c->current_color = 0;
+    c->primary_color = 0;
+    c->secondary_color = 1;
     /* Mono cascade: nothing to set true (since palette states are all
      * tracked but cascading would zero them based on color). Keep
      * existing mono. */
@@ -260,18 +238,6 @@ void jt_canvas_mono_reset(jt_canvas_t *c)
     jt_canvas_push_undo(c);
     memset(c->mono_bits, 0, sizeof(c->mono_bits));
     memset(c->mono_palette_states, 0, sizeof(c->mono_palette_states));
-}
-
-void jt_canvas_swap_color(jt_canvas_t *c, int x, int y)
-{
-    if (!in_bounds(x, y) || c->layer != JT_LAYER_COLOR) return;
-    jt_canvas_push_undo(c);
-    uint8_t src = c->color_indices[idx_for(x, y)] & 0x0F;
-    uint8_t dst = c->current_color & 0x0F;
-    if (src == dst) return;
-    for (int i = 0; i < JT_CANVAS_W * JT_CANVAS_H; i++) {
-        if ((c->color_indices[i] & 0x0F) == src) c->color_indices[i] = dst;
-    }
 }
 
 uint16_t jt_canvas_pixel_argb1555(const jt_canvas_t *c, int x, int y)

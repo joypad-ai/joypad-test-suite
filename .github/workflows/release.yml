@@ -248,11 +248,17 @@ jobs:
         if: needs.parse.outputs.console == 'dc'
         working-directory: dc
         run: |
-          # Single .cdi artifact; bootable on Flycast/Redream and on
-          # real DC hardware via GDEMU / MODE / CD-R.
+          # The .cdi is bootable on Flycast/Redream and on real DC
+          # hardware via GDEMU / MODE / CD-R. mkdcdisc pads the data
+          # track out to ~700MB so the real files sit on the disc's
+          # outer edge (best CD-R read reliability on original GD-ROM
+          # drives) -- but that padding is zero-fill, so we ship a zip
+          # (~700MB -> ~2MB) and let the user extract the .cdi.
           VERSION="${{ needs.parse.outputs.version }}"
           mkdir -p _release
           cp build/joypad-tester-dreamcast.cdi "_release/joypad_tester_dc_v${VERSION}.cdi"
+          ( cd _release && zip -9 -m "joypad_tester_dc_v${VERSION}.cdi.zip" \
+                                     "joypad_tester_dc_v${VERSION}.cdi" )
           ls -la _release/
 
       - name: Stage release artifacts (N64)

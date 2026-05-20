@@ -193,8 +193,10 @@ Dreamcast — the disc is a selfboot image with a valid IP.BIN.
 
 Tagged as `dc-v<semver>` from the repo root — see
 [`dc/CHANGELOG.md`](CHANGELOG.md) for per-version notes. The release
-workflow attaches `joypad_tester_dc_v<semver>.cdi` to each GitHub
-Release.
+workflow attaches `joypad_tester_dc_v<semver>.cdi.zip` to each GitHub
+Release — extract it to get the `.cdi`. (mkdcdisc pads the disc to
+~700MB for CD-R outer-edge read reliability; the padding is zero-fill,
+so the zip is only ~2MB.)
 
 ## Origin / credits
 

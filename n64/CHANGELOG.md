@@ -1,5 +1,26 @@
 # Joypad Tester — Nintendo 64 — Changelog
 
+## v1.0.1 — 2026-05-20
+
+Adds RandNet keyboard (RND-001) support to the controller tester.
+The keyboard is the Japan-only RANDnet 64DD peripheral; libdragon
+only ships its Joybus identifier, so the read protocol is hand-rolled
+over `joybus_exec_cmd`.
+
+### Highlights
+
+- **RandNet keyboard**: a port reporting identifier `0x0002` is
+  labelled `Keybd / RandNet Keyboard` and polled with Joybus command
+  `0x13`. The full 85-key matrix is decoded (transcribed from the
+  n64brew wiki "Keyboard" map, cross-checked against meeq's
+  KeyboardTest-N64), so the tester shows the **named keys** being held
+  (`A`, `Space`, `Shift`, `Enter`, `F5`, …) plus a live **`Typed:`**
+  line with a blinking cursor — Shift upper-cases letters, BackSpace
+  deletes. Caps / Num lock indicators, and the keyboard's physical
+  Power / Caps / Num Lock **LEDs** are driven over the wire.
+  Unverified on real RND-001 hardware (no emulator emulates it), but
+  protocol + scancodes are correct-by-source.
+
 ## v1.0.0 — 2026-05-19
 
 First public release. Joint v1.0.0 cut alongside the other consoles.

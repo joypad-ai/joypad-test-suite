@@ -21,6 +21,7 @@ case "${1:-build}" in
             -u "$(id -u):$(id -g)" \
             "$IMAGE_TAG" \
             make
+        "$(dirname "$0")/../collect.sh" pce || true
         ;;
     clean)
         docker run --rm \

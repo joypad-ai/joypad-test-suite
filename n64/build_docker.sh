@@ -27,6 +27,7 @@ case "${1:-build}" in
         # pattern from n64.mk applying target-specific LDFLAGS twice.
         cp -f joypad-tester.z64 build/joypad-tester.z64
         echo "Built build/joypad-tester.z64"
+        "$(dirname "$0")/../collect.sh" n64 || true
         ;;
     clean)
         rm -rf build/

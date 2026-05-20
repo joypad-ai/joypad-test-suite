@@ -155,6 +155,7 @@ extern Err _Wheel_DriverletEntry(PodInterface *);
                 cp iso/$TARGET.iso /work/build/$TARGET.iso
             "
         echo "Built build/$TARGET.iso"
+        "$(dirname "$0")/../collect.sh" 3do || true
         ;;
     clean)
         rm -rf build/

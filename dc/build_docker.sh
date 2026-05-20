@@ -27,6 +27,7 @@ case "${1:-build}" in
             "$IMAGE_TAG" \
             make
         echo "[build_docker.sh] Built build/joypad-tester-dreamcast.cdi"
+        "$(dirname "$0")/../collect.sh" dc || true
         ;;
     clean)
         docker run --rm \

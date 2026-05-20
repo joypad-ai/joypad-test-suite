@@ -52,6 +52,7 @@ case "${1:-build}" in
                 make
             "
         echo "Built build/joypad-tester.iso"
+        "$(dirname "$0")/../collect.sh" nuon || true
         ;;
     clean)
         rm -rf build/

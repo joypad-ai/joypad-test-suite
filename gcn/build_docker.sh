@@ -35,10 +35,12 @@ case $1 in
 
   wii)
     docker run -e "TARGET_CONSOLE=wii" "${COMMON_DOCKER_ARGS[@]}"
+    "$(dirname "$0")/../collect.sh" gcn || true
     ;;
 
   gamecube)
      docker run -e "TARGET_CONSOLE=gamecube" "${COMMON_DOCKER_ARGS[@]}"
+    "$(dirname "$0")/../collect.sh" gcn || true
     ;;
 
   clean)

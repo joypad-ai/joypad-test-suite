@@ -260,6 +260,16 @@ running devkitARM). For consoles whose artifacts are end-user
 downloads only, leave them out of git and let the release workflow
 build them.
 
+Each console's build still lands in its own `<console>/build/`, but a
+successful `build_docker.sh` also copies the final ROM into a repo-root
+`releases/` folder (gitignored) under a stable versionless name
+(`joypad_tester_<console>.<ext>`), so the latest build of any console
+is in one place regardless of which subdir you're working in. The
+top-level `collect.sh` does the copy — run `./collect.sh` to gather
+everything currently built, or `./collect.sh <console> …` for a
+subset. (The release workflow attaches the *versioned* names; this is
+a dev convenience only.)
+
 ## CI: build verification (`.github/workflows/verify-build.yml`)
 
 Runs on every push to `main` and every PR. Strategy is a matrix:

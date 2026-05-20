@@ -31,9 +31,9 @@ A collection of homebrew controller test ROMs across game consoles. Each console
 | 3DO | released | [`3do/`](3do/) | [MIT](3do/LICENSE.md) |
 | Game Boy Advance | released | [`gba/`](gba/) | [MIT](gba/LICENSE.md) |
 | GameCube | released | [`gcn/`](gcn/) | [zlib](gcn/LICENSE.md) |
+| Nintendo 64 | released | [`n64/`](n64/) | [MIT](n64/LICENSE.md) |
 | PC Engine | released | [`pce/`](pce/) | [MIT](pce/LICENSE.md) |
 | Dreamcast | beta | [`dc/`](dc/) | [MIT](dc/LICENSE.md) |
-| Nintendo 64 | beta | [`n64/`](n64/) | [MIT](n64/LICENSE.md) |
 | NUON | alpha | [`nuon/`](nuon/) | [MIT](nuon/LICENSE.md) |
 | NES | planned | — | — |
 | SNES | planned | — | — |
